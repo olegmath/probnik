@@ -1,70 +1,95 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getRatings } from '../lib/marathonApi.js';
-
-function FlameIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M12 2C12 2 7 8 7 13a5 5 0 0010 0c0-5-5-11-5-11z" fill="var(--blue)" stroke="var(--black)" strokeWidth="1.5" strokeLinejoin="round"/>
-      <path d="M12 14c0 1.1-.9 2-2 2" stroke="var(--white)" strokeWidth="1.2" strokeLinecap="round"/>
-    </svg>
-  );
-}
-function ThumbsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M7 22V11M2 13v7a2 2 0 002 2h11.5a2 2 0 001.98-1.74l1-8A2 2 0 0016.5 9H14V5a2 2 0 00-2-2h-.5c-.83 0-1.5.67-1.5 1.5V8a1 1 0 01-1 1H4a2 2 0 00-2 2v2z" stroke="var(--blue)" strokeWidth="1.8" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-function TurtleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <ellipse cx="12" cy="12" rx="6" ry="5" stroke="var(--blue)" strokeWidth="1.8"/>
-      <path d="M6 10l-3-2M6 14l-3 2M18 10l3-2M18 14l3 2M10 17l-1 3M14 17l1 3" stroke="var(--blue)" strokeWidth="1.8" strokeLinecap="round"/>
-    </svg>
-  );
-}
+import { IconCrownFilled, IconRocket, IconSeedlingFilled } from '@tabler/icons-react';
 
 const SCORE_STATUS = (score) => score >= 95 ? 'legends' : score >= 45 ? 'champs' : 'starters';
 
+function nameHash(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xfffff;
+  return h;
+}
+
+function Avatar({ name, size = 32 }) {
+  const hue = nameHash(name) % 360;
+  const initials = name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: `hsl(${hue}, 60%, 55%)`,
+      color: '#fff', fontWeight: 800, fontSize: size * 0.38,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0, lineHeight: 1,
+    }}>
+      {initials}
+    </div>
+  );
+}
+
+const MEDAL_BY_PLACE = {
+  1: { emoji: '🥇', bg: '#fffbe8', accent: '#f5c842' },
+  2: { emoji: '🥈', bg: '#f6f6f6', accent: '#b0b0b0' },
+  3: { emoji: '🥉', bg: '#fff3ec', accent: '#d4845a' },
+};
+
 const COLUMN_CONFIG = {
-  legends: { title: 'ЛЕГЕНДЫ',   icon: <FlameIcon />,  color: '#f5a623' },
-  champs:  { title: 'КРУТЫШИ',   icon: <ThumbsIcon />, color: 'var(--blue)' },
-  starters:{ title: 'НА СТАРТЕ', icon: <TurtleIcon />, color: 'var(--gray)' },
+  legends: { title: 'ЛЕГЕНДЫ',   color: '#f5a623', accentBg: '#fff9ee', icon: <IconCrownFilled size={18} /> },
+  champs:  { title: 'КРУТЫШИ',   color: 'var(--blue)', accentBg: '#eef4ff', icon: <IconRocket size={18} /> },
+  starters:{ title: 'НА СТАРТЕ', color: '#888', accentBg: '#f7f7f7', icon: <IconSeedlingFilled size={18} /> },
 };
 
 function RatingColumn({ type, players }) {
   const cfg = COLUMN_CONFIG[type];
-  const slots = [...players, ...Array(Math.max(0, 5 - players.length)).fill(null)];
   return (
     <div style={{ flex: 1, minWidth: 0, border: '2px solid var(--border)', borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ background: 'var(--black)', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.01em', fontStyle: 'italic', color: cfg.color }}>{cfg.title}</span>
-        {cfg.icon}
+      {/* Header */}
+      <div style={{ borderBottom: `3px solid ${cfg.color}`, background: cfg.accentBg, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ color: cfg.color, display: 'flex', alignItems: 'center' }}>{cfg.icon}</span>
+        <span style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.01em', fontStyle: 'italic', color: cfg.color }}>{cfg.title}</span>
+        {players.length > 0 && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#aaa', letterSpacing: '0.04em', marginLeft: 'auto' }}>{players.length}</span>
+        )}
       </div>
-      <div style={{ padding: '4px 0', display: 'grid', gridTemplateColumns: '52px 1fr', gap: '0 8px', alignItems: 'center', borderBottom: '1px solid var(--border)', marginBottom: 0, background: '#fafafa' }}>
-        <div style={{ padding: '5px 16px', fontSize: 9, fontWeight: 900, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>МЕСТО</div>
+      {/* Subheader */}
+      <div style={{ padding: '4px 0', display: 'grid', gridTemplateColumns: '44px 32px 1fr', gap: '0 8px', alignItems: 'center', borderBottom: '1px solid var(--border)', background: '#fafafa' }}>
+        <div style={{ padding: '5px 0 5px 14px', fontSize: 9, fontWeight: 900, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>#</div>
+        <div />
         <div style={{ padding: '5px 0', fontSize: 9, fontWeight: 900, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ИМЯ / БАЛЛЫ</div>
       </div>
-      <div style={{ flex: 1 }}>
-        {slots.map((p, i) =>
-          p ? (
-            <div key={`${p.name}-${i}`} style={{ display: 'grid', gridTemplateColumns: '52px 1fr', gap: '0 8px', alignItems: 'center', padding: '7px 0 7px 16px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: i < 3 ? cfg.color : 'var(--black)', lineHeight: 1, fontStyle: 'italic' }}>{p.place || i + 1}</div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, fontStyle: 'italic', lineHeight: 1.2, color: 'var(--black)' }}>{p.name}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue)', marginTop: 1 }}>
-                  {typeof p.finalScore === 'number' ? p.finalScore.toFixed(2) : (p.score || 0)}
+      {/* Rows */}
+      <div style={{ flex: 1, maxHeight: 400, overflowY: 'auto' }}>
+        {players.length === 0 ? (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--gray)', fontSize: 13, fontWeight: 600 }}>Нет участников</div>
+        ) : players.map((p, i) => {
+          const score = typeof p.finalScore === 'number' ? p.finalScore : (p.score || 0);
+          const place = p.place || i + 1;
+          const medal = MEDAL_BY_PLACE[place];
+          return (
+            <div key={`${p.name}-${i}`} style={{
+              display: 'grid', gridTemplateColumns: '44px 32px 1fr',
+              gap: '0 8px', alignItems: 'center',
+              padding: '8px 12px 8px 14px',
+              borderBottom: '1px solid var(--border)',
+              background: medal ? medal.bg : 'transparent',
+              borderLeft: medal ? `3px solid ${medal.accent}` : '3px solid transparent',
+            }}>
+              <div style={{ fontSize: medal ? 20 : 18, fontWeight: 900, color: medal ? 'inherit' : 'var(--gray)', lineHeight: 1, fontStyle: medal ? 'normal' : 'italic', textAlign: 'center' }}>
+                {medal ? medal.emoji : place}
+              </div>
+              <Avatar name={p.name} size={28} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, fontStyle: 'italic', lineHeight: 1.2, color: 'var(--black)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: cfg.color, marginTop: 1 }}>
+                  {score.toFixed(2)}
+                </div>
+                <div style={{ marginTop: 4, height: 3, borderRadius: 2, background: 'var(--border)', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.min(100, score)}%`, background: cfg.color, borderRadius: 2, transition: 'width 0.4s ease' }} />
                 </div>
               </div>
             </div>
-          ) : (
-            <div key={`empty-${i}`} style={{ height: 44, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', padding: '0 16px' }}>
-              <div style={{ height: 1, background: 'var(--border)', width: '100%', opacity: 0.5 }} />
-            </div>
-          )
-        )}
+          );
+        })}
       </div>
     </div>
   );
