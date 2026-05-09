@@ -60,7 +60,7 @@ export default function ProbnikDetail() {
             <div key={`task-${i + startIdx}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'start', gap: 8, borderBottom: '1px solid var(--border)', padding: '3px 0', breakInside: 'avoid' }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.05, marginBottom: taskTheme ? 1 : 0 }}>{taskLabel}</div>
-                {taskTheme && <div title={taskTheme} style={{ fontSize: 10, color: 'var(--gray)', lineHeight: 1.12, overflowWrap: 'anywhere' }}>{taskTheme}</div>}
+                {taskTheme && <div title={taskTheme} className="task-theme-text" style={{ fontSize: 10, color: 'var(--gray)', lineHeight: 1.12, overflowWrap: 'anywhere' }}>{taskTheme}</div>}
               </div>
               <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 800, color, whiteSpace: 'nowrap' }}>{scoreNum}/{maxScore}</div>
             </div>

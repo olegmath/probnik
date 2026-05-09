@@ -185,7 +185,7 @@ export default function ErrorMap() {
       </div>
 
       {subjects.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
+        <div className="subject-filter-grid" style={{ marginBottom: 22 }}>
           {subjects.map((s) => {
             const active = activeSubject === s;
             return (

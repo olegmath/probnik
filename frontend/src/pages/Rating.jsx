@@ -191,7 +191,7 @@ export default function Rating() {
       </div>
 
       {/* Subject buttons */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div className="subject-filter-grid" style={{ marginBottom: 12 }}>
         {subjects.map((s) => {
           const active = activeSubject === s;
           return (

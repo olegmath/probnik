@@ -69,17 +69,18 @@ export default function ThemeAnalysis({ subject }) {
     return (
       <button
         key={id}
+        className="zone-btn"
         onClick={() => setActiveZone(id)}
-        style={{ border: `2px solid ${zone.color}`, background: 'var(--white)', borderRadius: 10, padding: '10px 9px', minWidth: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter', boxShadow: '0 2px 0 rgba(26,26,26,0.08)', transition: 'transform 0.15s, background 0.15s, box-shadow 0.15s' }}
+        style={{ border: `2px solid ${zone.color}`, background: 'var(--white)', borderRadius: 10, padding: '10px 9px', minWidth: 0, cursor: 'pointer', boxShadow: '0 2px 0 rgba(26,26,26,0.08)', transition: 'transform 0.15s, background 0.15s, box-shadow 0.15s', gap: 8 }}
         onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = '#fafafa'; e.currentTarget.style.boxShadow = '0 4px 0 rgba(26,26,26,0.1)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.background = 'var(--white)'; e.currentTarget.style.boxShadow = '0 2px 0 rgba(26,26,26,0.08)'; }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
           <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase', color: zone.color, whiteSpace: 'nowrap' }}>{zone.title}</span>
           <span style={{ fontSize: 18, fontWeight: 950, color: zone.color, lineHeight: 1 }}>{zone.themes.length}</span>
         </div>
-        <div style={{ fontSize: 10, color: 'var(--gray)', fontWeight: 750, marginTop: 4 }}>{zone.note}</div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 7 }}>
+        <div className="zone-btn-meta" style={{ fontSize: 10, color: 'var(--gray)', fontWeight: 750, marginTop: 4 }}>{zone.note}</div>
+        <div className="zone-btn-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 7 }}>
           <span style={{ fontSize: 10, color: 'var(--gray)', fontWeight: 850 }}>-{lost} б.</span>
           <span style={{ fontSize: 10, color: 'var(--black)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Открыть ›</span>
         </div>
@@ -120,7 +121,7 @@ export default function ThemeAnalysis({ subject }) {
           <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 10, flexShrink: 0 }}>Главная боль</div>
           <div style={{ fontSize: 24, fontWeight: 950, lineHeight: 0.98, color: totalLost > 0 ? 'var(--black)' : '#34b87a', marginTop: 5, overflowWrap: 'anywhere', flexShrink: 0 }}>{focusText}</div>
           <div style={{ fontSize: 11, fontWeight: 750, color: 'var(--gray)', marginTop: 8, flexShrink: 0 }}>Потеряно {totalLost} из {totalPossible} баллов</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 'auto', paddingTop: 12, flexShrink: 0 }}>
+          <div className="theme-zones-grid">
             {renderZoneButton('weak', zones.weak)}
             {renderZoneButton('watch', zones.watch)}
             {renderZoneButton('strong', zones.strong)}
