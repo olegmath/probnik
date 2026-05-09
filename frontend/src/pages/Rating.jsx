@@ -146,9 +146,14 @@ export default function Rating() {
   }, [rawRows, activeSubject, activeLevel, activeTeacher, activeGroup]);
 
   const { legends, champs, starters } = useMemo(() => {
-    const ranked = [...filteredRows]
-      .sort((a, b) => (b.finalScore ?? b.score ?? 0) - (a.finalScore ?? a.score ?? 0))
-      .map((r, i) => ({ ...r, place: i + 1 }));
+    const sorted = [...filteredRows].sort((a, b) => (b.finalScore ?? b.score ?? 0) - (a.finalScore ?? a.score ?? 0));
+    let currentPlace = 0;
+    let prevScore = null;
+    const ranked = sorted.map((r, i) => {
+      const score = r.finalScore ?? r.score ?? 0;
+      if (score !== prevScore) { currentPlace = i + 1; prevScore = score; }
+      return { ...r, place: currentPlace };
+    });
     return {
       legends:  ranked.filter((r) => SCORE_STATUS(r.finalScore ?? r.score ?? 0) === 'legends'),
       champs:   ranked.filter((r) => SCORE_STATUS(r.finalScore ?? r.score ?? 0) === 'champs'),

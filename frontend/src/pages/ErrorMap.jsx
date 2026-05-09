@@ -32,6 +32,145 @@ function AttemptDots({ attempts = [] }) {
   );
 }
 
+function getQuestionTaskLabel(q) {
+  const plan = q?.plannedTask || null;
+  return plan?.label || String(Number(q?.number || 0) || '');
+}
+function getQuestionTaskKey(q) {
+  const plan = q?.plannedTask || null;
+  return plan?.key || getQuestionTaskLabel(q);
+}
+function getQuestionSortNumber(q) {
+  const plan = q?.plannedTask || null;
+  return Number(plan?.number || q?.taskNumber || q?.number || 0);
+}
+function getQuestionTopicNote(q, fallbackPlan = null) {
+  const plan = q?.plannedTask || {};
+  const section = plan.section || fallbackPlan?.section || '';
+  const topic = plan.topic || fallbackPlan?.topic || '';
+  return [section, topic].filter(Boolean).join(' · ');
+}
+
+function buildErrorMapAnalytics(days) {
+  const taskMap = new Map();
+  for (const day of days) {
+    for (const item of day.maps || []) {
+      for (const question of item.questions || []) {
+        const taskKey = getQuestionTaskKey(question);
+        if (!taskKey) continue;
+        const task = taskMap.get(taskKey) || {
+          key: taskKey,
+          number: getQuestionTaskLabel(question),
+          sortNumber: getQuestionSortNumber(question),
+          topicNote: getQuestionTopicNote(question, item.marathonPlan || day.marathonPlan),
+          days: new Set(),
+          wrongAttempts: 0,
+          wrongHomeworks: 0,
+          fixed: 0,
+          remaining: 0,
+          attempts: 0,
+        };
+        task.days.add(day.title || day.dateLabel || day.dateKey || `День ${day.dayOrder || '?'}`);
+        task.wrongAttempts += Number(question.wrongAttempts || 0);
+        task.wrongHomeworks += 1;
+        task.attempts += (question.attempts || []).length;
+        if (question.status === 'fixed') task.fixed += 1;
+        else task.remaining += 1;
+        taskMap.set(taskKey, task);
+      }
+    }
+  }
+
+  const byPriority = (a, b) =>
+    b.remaining - a.remaining || b.wrongHomeworks - a.wrongHomeworks ||
+    b.wrongAttempts - a.wrongAttempts || a.sortNumber - b.sortNumber ||
+    String(a.number || '').localeCompare(String(b.number || ''), 'ru');
+
+  const tasks = [...taskMap.values()].map((t) => ({ ...t, dayLabels: [...t.days] }));
+  const remainingTasks = tasks.filter((t) => t.remaining > 0).sort(byPriority);
+  const frequentErrors = tasks
+    .filter((t) => t.wrongHomeworks >= 2 || t.wrongAttempts >= 3)
+    .sort((a, b) => b.wrongHomeworks - a.wrongHomeworks || b.wrongAttempts - a.wrongAttempts || a.sortNumber - b.sortNumber);
+  const fixedTasks = tasks
+    .filter((t) => t.fixed > 0 && t.remaining === 0)
+    .sort((a, b) => b.fixed - a.fixed || a.sortNumber - b.sortNumber);
+  const cleanDays = days.filter((day) => (day.maps || []).length > 0 && (day.maps || []).every((item) => Number(item.summary?.wrongTotal || 0) === 0));
+
+  const recommendations = [];
+  if (remainingTasks.length > 0) {
+    recommendations.push(`Сначала закрыть задания ${remainingTasks.slice(0, 4).map((t) => `№${t.number}`).join(', ')}: там ещё есть неисправленные ошибки.`);
+  }
+  if (frequentErrors.length > 0) {
+    recommendations.push(`Отдельно повторить частые ошибки: ${frequentErrors.slice(0, 4).map((t) => `№${t.number}`).join(', ')}.`);
+  }
+  if (fixedTasks.length > 0) {
+    recommendations.push(`Закрепить уже исправленное: ${fixedTasks.slice(0, 4).map((t) => `№${t.number}`).join(', ')} лучше дать в короткой повторной практике.`);
+  }
+  if (cleanDays.length > 0) {
+    recommendations.push(`Есть дни без ошибок в проверенных попытках: ${cleanDays.slice(0, 2).map((d) => d.title || d.dateLabel || `день ${d.dayOrder || '?'}`).join(', ')}.`);
+  }
+  if (recommendations.length === 0) {
+    const hasMaps = days.some((d) => (d.maps || []).length > 0);
+    recommendations.push(hasMaps
+      ? 'Критичных повторяющихся ошибок не видно: можно работать точечно по дневным карточкам ниже.'
+      : 'Когда появятся проверенные попытки, здесь соберётся приоритетный список заданий.');
+  }
+
+  return { tasks, remainingTasks, frequentErrors, fixedTasks, recommendations: recommendations.slice(0, 4) };
+}
+
+function TaskGroup({ title, tasks, color, emptyText }) {
+  const visible = tasks.slice(0, 5);
+  return (
+    <div style={{ minWidth: 0, flex: '1 1 180px' }}>
+      <div style={{ fontSize: 11, fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.07em', color, marginBottom: 8 }}>{title}</div>
+      {visible.length > 0 ? visible.map((task) => (
+        <div key={task.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ background: color, color: '#fff', borderRadius: 6, padding: '2px 8px', fontWeight: 900, fontSize: 12, whiteSpace: 'nowrap' }}>№{task.number}</span>
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray)', lineHeight: 1.2, overflowWrap: 'anywhere' }}>
+              {task.topicNote || task.dayLabels.slice(0, 2).join(', ') || 'по карте ошибок'}
+            </div>
+          </span>
+          <span style={{ fontWeight: 900, fontSize: 12, color, whiteSpace: 'nowrap' }}>{task.wrongAttempts}×</span>
+        </div>
+      )) : (
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray)', padding: '8px 0' }}>{emptyText}</div>
+      )}
+    </div>
+  );
+}
+
+function ErrorInsights({ days }) {
+  const analytics = buildErrorMapAnalytics(days);
+  if (!analytics.tasks.length) return null;
+
+  return (
+    <div style={{ display: 'flex', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
+      <div style={{ flex: '2 1 400px', border: '2px solid var(--border)', borderRadius: 12, padding: 14, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Статистика по заданиям</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--gray)' }}>по всем проверенным попыткам</div>
+        </div>
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          <TaskGroup title="Нужно исправить" tasks={analytics.remainingTasks} color="#e05454" emptyText="Неисправленных ошибок нет" />
+          <TaskGroup title="Частые ошибки" tasks={analytics.frequentErrors} color="#f5a623" emptyText="Повторяющихся ошибок пока нет" />
+          <TaskGroup title="Исправлено" tasks={analytics.fixedTasks} color="#34b87a" emptyText="Исправленных ошибок пока нет" />
+        </div>
+      </div>
+      <div style={{ flex: '1 1 220px', border: '2px solid var(--black)', borderRadius: 12, padding: 14, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>На что обратить внимание</div>
+        {analytics.recommendations.map((text, i) => (
+          <div key={`rec-${i}`} style={{ display: 'grid', gridTemplateColumns: '22px minmax(0,1fr)', gap: 8, alignItems: 'start' }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: i === 0 ? 'var(--blue)' : '#f5f5f5', color: i === 0 ? 'var(--white)' : 'var(--black)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 950 }}>{i + 1}</div>
+            <div style={{ fontSize: 13, fontWeight: 750, lineHeight: 1.28, overflowWrap: 'anywhere' }}>{text}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DayCard({ day }) {
   const subMaps = day.maps || [];
   const questions = subMaps.flatMap((item) =>
@@ -229,6 +368,7 @@ export default function ErrorMap() {
               </div>
             ))}
           </div>
+          <ErrorInsights days={maps} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {maps.map((day, i) => <DayCard key={day.dayOrder ?? day.dayKey ?? day.dateKey ?? i} day={day} />)}
           </div>

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { useProbnik } from '../lib/ProbnikProvider.jsx';
 import { safeDecode } from '../lib/safeDecode';
+import { getStudentYear } from '../lib/marathonApi.js';
 import Chip from '../components/ui/Chip.jsx';
 
 const TABS = [
@@ -11,41 +12,55 @@ const TABS = [
   { id: 'attendance', label: 'Посещаемость' },
 ];
 
-// DEMO data — replace when backend ready
-const MOCK_MONTHS = [
-  { month: 'Сентябрь 2025', hwDone: 8,  hwTotal: 8,  testAvg: 4.5, attendance: 100 },
-  { month: 'Октябрь 2025',  hwDone: 9,  hwTotal: 10, testAvg: 4.2, attendance: 95 },
-  { month: 'Ноябрь 2025',   hwDone: 7,  hwTotal: 9,  testAvg: 3.8, attendance: 88 },
-  { month: 'Декабрь 2025',  hwDone: 6,  hwTotal: 8,  testAvg: 4.0, attendance: 92 },
-  { month: 'Январь 2026',   hwDone: 5,  hwTotal: 6,  testAvg: 4.6, attendance: 100 },
-  { month: 'Февраль 2026',  hwDone: 8,  hwTotal: 10, testAvg: 4.1, attendance: 90 },
-  { month: 'Март 2026',     hwDone: 9,  hwTotal: 10, testAvg: 4.3, attendance: 95 },
-  { month: 'Апрель 2026',   hwDone: 7,  hwTotal: 9,  testAvg: 4.4, attendance: 89 },
-  { month: 'Май 2026',      hwDone: 4,  hwTotal: 5,  testAvg: 4.7, attendance: 100 },
-];
-
 function pctColor(pct) {
   if (pct >= 95) return 'var(--blue)';
   if (pct >= 80) return 'var(--black)';
   return '#e05';
 }
 
-function OverviewTable() {
-  const totalHwDone = MOCK_MONTHS.reduce((acc, m) => acc + m.hwDone, 0);
-  const totalHwAll = MOCK_MONTHS.reduce((acc, m) => acc + m.hwTotal, 0);
-  const avgTest = (MOCK_MONTHS.reduce((acc, m) => acc + m.testAvg, 0) / MOCK_MONTHS.length).toFixed(2);
-  const avgAttendance = Math.round(MOCK_MONTHS.reduce((acc, m) => acc + m.attendance, 0) / MOCK_MONTHS.length);
+function OverviewTable({ months, summary, loading, error }) {
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--gray)', fontSize: 14, fontWeight: 600 }}>
+        Загружаем данные…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ border: '2px solid #e05', borderRadius: 12, padding: '16px 20px', color: '#e05', fontSize: 14, fontWeight: 700 }}>
+        Ошибка загрузки: {error}
+      </div>
+    );
+  }
+
+  if (!months || months.length === 0) {
+    return (
+      <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '40px 24px', textAlign: 'center' }}>
+        <div style={{ fontSize: 14, color: 'var(--gray)', fontWeight: 600 }}>Данные за этот период недоступны</div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div style={{ border: '2px solid #f5a623', background: 'rgba(245,166,35,0.08)', borderRadius: 12, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#B46C00', background: 'rgba(245,166,35,0.18)', padding: '3px 8px', borderRadius: 6 }}>DEMO</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#B46C00' }}>Демонстрационные данные. Реальная интеграция в разработке.</span>
-      </div>
       <div className="year-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
-        <SummaryCard label="Домашки" value={`${totalHwDone}/${totalHwAll}`} note={`${Math.round((totalHwDone / totalHwAll) * 100)}% сдано`} />
-        <SummaryCard label="Контрольные" value={avgTest} note="средний балл" />
-        <SummaryCard label="Посещаемость" value={`${avgAttendance}%`} note="средняя за год" />
+        <SummaryCard
+          label="Домашки"
+          value={`${summary.hwDone}/${summary.hwTotal}`}
+          note={summary.hwTotal > 0 ? `${Math.round((summary.hwDone / summary.hwTotal) * 100)}% сдано` : 'нет данных'}
+        />
+        <SummaryCard
+          label="Контрольные"
+          value={summary.testAvg != null ? summary.testAvg.toFixed(1) : '—'}
+          note="средний балл"
+        />
+        <SummaryCard
+          label="Посещаемость"
+          value={`${summary.attendancePct}%`}
+          note="средняя за год"
+        />
       </div>
 
       {/* Desktop table */}
@@ -56,7 +71,7 @@ function OverviewTable() {
           <Th>Контрольные</Th>
           <Th>Посещаемость</Th>
         </div>
-        {MOCK_MONTHS.map((m, i) => (
+        {months.map((m, i) => (
           <div
             key={m.month}
             style={{
@@ -71,7 +86,11 @@ function OverviewTable() {
               <span style={{ fontWeight: 800 }}>{m.hwDone}</span>
               <span style={{ color: 'var(--gray)', fontWeight: 600 }}> / {m.hwTotal}</span>
             </Td>
-            <Td><span style={{ fontWeight: 800, color: 'var(--blue)' }}>{m.testAvg.toFixed(1)}</span></Td>
+            <Td>
+              <span style={{ fontWeight: 800, color: 'var(--blue)' }}>
+                {m.testAvg != null ? m.testAvg.toFixed(1) : '—'}
+              </span>
+            </Td>
             <Td><span style={{ fontWeight: 800, color: pctColor(m.attendance) }}>{m.attendance}%</span></Td>
           </div>
         ))}
@@ -79,7 +98,7 @@ function OverviewTable() {
 
       {/* Mobile cards */}
       <div className="year-month-cards">
-        {MOCK_MONTHS.map((m) => (
+        {months.map((m) => (
           <div key={m.month} style={{ border: '1.5px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
             <div style={{ background: 'var(--black)', color: 'var(--white)', padding: '10px 16px', fontSize: 13, fontWeight: 900, letterSpacing: '-0.01em' }}>
               {m.month}
@@ -91,12 +110,14 @@ function OverviewTable() {
                   {m.hwDone}<span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600 }}>/{m.hwTotal}</span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>
-                  {Math.round((m.hwDone / m.hwTotal) * 100)}% сдано
+                  {m.hwTotal > 0 ? `${Math.round((m.hwDone / m.hwTotal) * 100)}% сдано` : 'нет ДЗ'}
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--gray)', marginBottom: 6 }}>Контрол.</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--blue)', lineHeight: 1 }}>{m.testAvg.toFixed(1)}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--blue)', lineHeight: 1 }}>
+                  {m.testAvg != null ? m.testAvg.toFixed(1) : '—'}
+                </div>
                 <div style={{ fontSize: 11, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>средний</div>
               </div>
               <div>
@@ -107,7 +128,6 @@ function OverviewTable() {
           </div>
         ))}
       </div>
-
     </div>
   );
 }
@@ -155,8 +175,29 @@ export default function SchoolYear() {
   const { state } = useLocation();
   const { allStudents } = useProbnik();
   const [tab, setTab] = useState('overview');
+  const [months, setMonths] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const student = state?.student || allStudents[safeDecode(id)];
+
+  useEffect(() => {
+    if (!student) return;
+    setLoading(true);
+    setError(null);
+    getStudentYear(student.name)
+      .then((data) => {
+        if (data.ok) {
+          setMonths(data.months);
+          setSummary(data.summary);
+        } else {
+          setError(data.error || 'Данные недоступны');
+        }
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [student?.name]);
 
   if (!student) {
     return (
@@ -209,7 +250,9 @@ export default function SchoolYear() {
           })}
         </div>
 
-        {tab === 'overview' && <OverviewTable />}
+        {tab === 'overview' && (
+          <OverviewTable months={months} summary={summary} loading={loading} error={error} />
+        )}
         {tab === 'homework' && (
           <ComingSoon
             title="Домашки в деталях"
@@ -232,4 +275,3 @@ export default function SchoolYear() {
     </section>
   );
 }
-

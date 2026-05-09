@@ -59,7 +59,7 @@ export default function ProbnikDetail() {
           return (
             <div key={`task-${i + startIdx}`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'start', gap: 8, borderBottom: '1px solid var(--border)', padding: '3px 0', breakInside: 'avoid' }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.05, marginBottom: taskTheme ? 1 : 0 }}>{taskLabel}</div>
+                <div className="task-label-text" style={{ fontSize: 12, fontWeight: 800, lineHeight: 1.05, marginBottom: taskTheme ? 1 : 0 }}>{taskLabel}</div>
                 {taskTheme && <div title={taskTheme} className="task-theme-text" style={{ fontSize: 10, color: 'var(--gray)', lineHeight: 1.12, overflowWrap: 'anywhere' }}>{taskTheme}</div>}
               </div>
               <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 800, color, whiteSpace: 'nowrap' }}>{scoreNum}/{maxScore}</div>
@@ -72,9 +72,9 @@ export default function ProbnikDetail() {
     const rowsCount = Math.max(0, endIdx - startIdx);
     const useFlowColumns = flowColumns && rowsCount > 17;
     return (
-      <div style={{ minWidth: 0, border: '2px solid var(--border)', borderRadius: 12, padding: 12, overflow: 'hidden', minHeight: 0, height: flowColumns ? '100%' : 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div className="part-box" style={{ minWidth: 0, border: '2px solid var(--border)', borderRadius: 12, padding: 12, overflow: 'hidden', minHeight: 0, height: flowColumns ? '100%' : 'auto', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--black)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>{title}</div>
-        <div style={{ flex: 1, minHeight: 0, columnCount: useFlowColumns ? 2 : 1, columnGap: 14, columnFill: 'auto', overflow: 'hidden' }}>
+        <div className="task-columns" style={{ flex: 1, minHeight: 0, columnCount: useFlowColumns ? 2 : 1, columnGap: 14, columnFill: 'auto', overflow: 'hidden' }}>
           {renderTaskRows(startIdx, endIdx)}
         </div>
       </div>

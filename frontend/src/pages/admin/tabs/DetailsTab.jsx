@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { Th, Td } from '../_helpers.jsx';
 import { setPenaltyOverride } from '../../../lib/marathonApi.js';
 
@@ -6,6 +6,9 @@ export default function DetailsTab({ rows }) {
   const [overrides, setOverrides] = useState({});
   const [saving, setSaving] = useState({});
   const [saveMsg, setSaveMsg] = useState({});
+  const [expanded, setExpanded] = useState({});
+
+  const toggleExpanded = (k) => setExpanded((prev) => ({ ...prev, [k]: !prev[k] }));
 
   const rowKey = (r) => `${r.name}||${r.subject}||${r.level}`;
 
@@ -57,7 +60,8 @@ export default function DetailsTab({ rows }) {
             const penalty = r.penalty ?? 0;
             const final = r.finalScore ?? r.final_score ?? score;
             return (
-              <tr key={k}>
+              <Fragment key={k}>
+              <tr>
                 <Td bold>{r.name}</Td>
                 <Td>{r.subject} {r.level}</Td>
                 <Td>{r.group || '—'}</Td>
@@ -87,10 +91,47 @@ export default function DetailsTab({ rows }) {
                       <button onClick={() => cancelEdit(r)} style={{ padding: '4px 10px', border: '2px solid var(--border)', borderRadius: 6, background: 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 900, cursor: 'pointer' }}>✕</button>
                     </span>
                   ) : (
-                    <button onClick={() => startEdit(r)} style={{ padding: '4px 10px', border: '2px solid var(--border)', borderRadius: 6, background: 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'var(--gray)' }}>Штраф</button>
+                    <span style={{ display: 'inline-flex', gap: 4 }}>
+                      {penalty > 0 && (
+                        <button onClick={() => toggleExpanded(k)} style={{ padding: '4px 10px', border: '2px solid var(--border)', borderRadius: 6, background: expanded[k] ? '#fff0f0' : 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: '#e05454' }}>
+                          {expanded[k] ? '▴ Скрыть' : '▾ Дни'}
+                        </button>
+                      )}
+                      <button onClick={() => startEdit(r)} style={{ padding: '4px 10px', border: '2px solid var(--border)', borderRadius: 6, background: 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'var(--gray)' }}>Штраф</button>
+                    </span>
                   )}
                 </Td>
               </tr>
+              {expanded[k] && (
+                <tr>
+                  <td colSpan={10} style={{ background: '#fff8f8', padding: '4px 16px 12px 32px', borderBottom: '1px solid var(--border)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'Inter' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #eee' }}>
+                          {['Дата / день', 'Дата сдачи', 'Первая попытка', 'Штраф за день'].map((h, i) => (
+                            <th key={i} style={{ padding: '4px 8px', textAlign: i === 0 ? 'left' : 'right', fontWeight: 900, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 9 }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(r.dailyScores ?? []).filter((d) => d.lateDays > 0).length === 0 ? (
+                          <tr><td colSpan={4} style={{ padding: '8px', color: 'var(--gray)', fontStyle: 'italic' }}>Нет дней с штрафом (штраф задан вручную?)</td></tr>
+                        ) : (
+                          (r.dailyScores ?? []).filter((d) => d.lateDays > 0).map((d, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid #f5e5e5' }}>
+                              <td style={{ padding: '4px 8px', fontWeight: 600 }}>{d.dateLabel || d.dateKey || '—'}</td>
+                              <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{d.submittedAt ? d.submittedAt.slice(0, 10) : '—'}</td>
+                              <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: 'monospace', color: 'var(--gray)' }}>{d.firstAttemptAt ? d.firstAttemptAt.slice(0, 10) : '—'}</td>
+                              <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 900, color: '#e05454' }}>{d.lateDays}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>
