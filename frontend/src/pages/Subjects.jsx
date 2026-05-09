@@ -1,6 +1,6 @@
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useProbnik } from '../lib/ProbnikProvider.jsx';
-import { pluralizeSubject, pluralizePoints, getMaxScore } from '../lib/probnikData.js';
+import { pluralizeSubject, pluralizePoints, getMaxScore, pluralizeAttempts } from '../lib/probnikData.js';
 import Chip from '../components/ui/Chip.jsx';
 import Squiggle from '../components/decor/Squiggle.jsx';
 
@@ -98,7 +98,7 @@ export default function Subjects() {
                   <div style={{ fontWeight: 800, letterSpacing: '-0.01em', fontSize: '20px' }}>{subj.name}</div>
                   {subj.date && (
                     <div style={{ fontSize: 12, color: 'var(--gray)', fontWeight: 700, marginTop: 4 }}>
-                      {subj.attempts && subj.attempts.length > 1 ? `${subj.attempts.length} пробника, последний ${subj.date}` : `Пробник ${subj.date}`}
+                      {subj.attempts && subj.attempts.length > 1 ? `${subj.attempts.length} ${pluralizeAttempts(subj.attempts.length)}, последний ${subj.date}` : `Пробник ${subj.date}`}
                     </div>
                   )}
                 </div>
