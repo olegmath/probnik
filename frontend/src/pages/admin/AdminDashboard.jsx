@@ -6,12 +6,14 @@ import DetailsTab from './tabs/DetailsTab.jsx';
 import TeachersTab from './tabs/TeachersTab.jsx';
 import DailyTab from './tabs/DailyTab.jsx';
 import GroupErrorsTab from './tabs/GroupErrorsTab.jsx';
+import GradesTab from './tabs/GradesTab.jsx';
 import ReportsTab from './tabs/ReportsTab.jsx';
 
 const TABS = [
   { id: 'details', label: 'Детали' },
   { id: 'teachers', label: 'Преподаватели' },
   { id: 'daily', label: 'По дням' },
+  { id: 'grades', label: 'ДЗ / КР' },
   { id: 'group-errors', label: 'Ошибки групп' },
   { id: 'reports', label: 'Отчёты' },
 ];
@@ -78,7 +80,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const showFilters = activeTab === 'details' || activeTab === 'teachers' || activeTab === 'daily';
+  const showFilters = activeTab === 'details' || activeTab === 'teachers' || activeTab === 'daily' || activeTab === 'grades';
 
   return (
     <main style={{ maxWidth: 1300, margin: '0 auto', width: '100%', padding: '28px 24px' }}>
@@ -124,6 +126,7 @@ export default function AdminDashboard() {
       {activeTab === 'details' && <DetailsTab rows={filteredRows} />}
       {activeTab === 'teachers' && <TeachersTab rows={filteredRows} />}
       {activeTab === 'daily' && <DailyTab rows={filteredRows} />}
+      {activeTab === 'grades' && <GradesTab subject={subject} level={level} teacher={teacher} group={group} />}
       {activeTab === 'group-errors' && <GroupErrorsTab allRows={rawRows} />}
       {activeTab === 'reports' && <ReportsTab allRows={rawRows} onLogout={handleLogout} />}
     </main>
