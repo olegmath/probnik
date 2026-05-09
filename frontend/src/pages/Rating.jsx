@@ -179,12 +179,12 @@ export default function Rating() {
   }
 
   return (
-    <main style={{ maxWidth: 1200, margin: '0 auto', width: '100%', padding: '32px 24px' }}>
+    <main className="page-pad" style={{ maxWidth: 1200, margin: '0 auto', width: '100%', padding: '32px 24px' }}>
       <button onClick={() => navigate(-1)} style={backBtnStyle}>← Назад</button>
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Марафон</div>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <h1 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.05, margin: 0 }}>
+          <h1 className="rating-page-title" style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.05, margin: 0 }}>
             РЕЙТИНГ <span style={{ fontStyle: 'italic', color: 'var(--blue)' }}>МАРАФОНА</span>
           </h1>
         </div>
@@ -243,7 +243,7 @@ export default function Rating() {
       {filteredRows.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--gray)', fontWeight: 700 }}>Нет данных по выбранным фильтрам</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+        <div className="rating-grid">
           <RatingColumn type="legends" players={legends} />
           <RatingColumn type="champs" players={champs} />
           <RatingColumn type="starters" players={starters} />

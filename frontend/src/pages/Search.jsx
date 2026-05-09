@@ -58,16 +58,16 @@ export default function Search() {
 
   return (
     <div style={{ minHeight: 'calc(100vh - 60px)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', padding: '40px 24px' }}>
-      <Squiggle style={{ position: 'absolute', top: 32, right: 48, opacity: 0.9, pointerEvents: 'none' }} />
-      <BookDeco style={{ position: 'absolute', bottom: 40, left: 36, opacity: 0.7, pointerEvents: 'none' }} />
-      <PenDeco style={{ position: 'absolute', bottom: 36, right: 64, opacity: 0.6, pointerEvents: 'none' }} />
+      <span className="search-deco"><Squiggle style={{ position: 'absolute', top: 32, right: 48, opacity: 0.9, pointerEvents: 'none' }} /></span>
+      <span className="search-deco"><BookDeco style={{ position: 'absolute', bottom: 40, left: 36, opacity: 0.7, pointerEvents: 'none' }} /></span>
+      <span className="search-deco"><PenDeco style={{ position: 'absolute', bottom: 36, right: 64, opacity: 0.6, pointerEvents: 'none' }} /></span>
 
       <div className="fade-up" style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 2 }}>
         <div style={{ textAlign: 'center', marginBottom: 44 }}>
           <Logo size={52} />
           <div style={{ marginTop: 24, lineHeight: 1.05 }}>
-            <div style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--black)' }}>ОБЩАЯ</div>
-            <div style={{ fontSize: 52, fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.03em', color: 'var(--blue)' }}>СТАТИСТИКА</div>
+            <div className="search-title" style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--black)' }}>ОБЩАЯ</div>
+            <div className="search-title" style={{ fontSize: 52, fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.03em', color: 'var(--blue)' }}>СТАТИСТИКА</div>
           </div>
           <p style={{ fontSize: 15, color: 'var(--gray)', marginTop: 16, fontWeight: 500, lineHeight: 1.6 }}>
             Введите фамилию и имя ученика,<br />чтобы посмотреть статистику

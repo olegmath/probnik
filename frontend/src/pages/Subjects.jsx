@@ -104,14 +104,14 @@ export default function Subjects() {
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0 }}>
-                <div style={{ width: 120, height: 6, borderRadius: 4, background: '#eee', overflow: 'hidden' }}>
+                <div className="subj-progress" style={{ width: 120, height: 6, borderRadius: 4, background: '#eee', overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${progressWidth}%`, background: dotColor, borderRadius: 4 }} />
                 </div>
                 <div style={{ width: 80, textAlign: 'right' }}>
                   <span style={{ fontWeight: 900, fontSize: 24, color: scoreTextColor }}>{p}</span>
                   <span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600 }}>{isOGE ? '/5' : '/100'}</span>
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 700, width: 54, textAlign: 'right' }}>{subj.primaryScore}/{getMaxScore(subj.name)}</div>
+                <div className="subj-primary" style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 700, width: 54, textAlign: 'right' }}>{subj.primaryScore}/{getMaxScore(subj.name)}</div>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M6 3L11 8L6 13" stroke="var(--border)" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>

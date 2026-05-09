@@ -42,13 +42,14 @@ function OverviewTable() {
         <span style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#B46C00', background: 'rgba(245,166,35,0.18)', padding: '3px 8px', borderRadius: 6 }}>DEMO</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: '#B46C00' }}>Демонстрационные данные. Реальная интеграция в разработке.</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
+      <div className="year-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
         <SummaryCard label="Домашки" value={`${totalHwDone}/${totalHwAll}`} note={`${Math.round((totalHwDone / totalHwAll) * 100)}% сдано`} />
         <SummaryCard label="Контрольные" value={avgTest} note="средний балл" />
         <SummaryCard label="Посещаемость" value={`${avgAttendance}%`} note="средняя за год" />
       </div>
 
-      <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+      {/* Desktop table */}
+      <div className="year-table-desktop" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
           <Th>Месяц</Th>
           <Th>Домашки</Th>
@@ -72,6 +73,37 @@ function OverviewTable() {
             </Td>
             <Td><span style={{ fontWeight: 800, color: 'var(--blue)' }}>{m.testAvg.toFixed(1)}</span></Td>
             <Td><span style={{ fontWeight: 800, color: pctColor(m.attendance) }}>{m.attendance}%</span></Td>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="year-month-cards">
+        {MOCK_MONTHS.map((m) => (
+          <div key={m.month} style={{ border: '1.5px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--black)', color: 'var(--white)', padding: '10px 16px', fontSize: 13, fontWeight: 900, letterSpacing: '-0.01em' }}>
+              {m.month}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '14px 16px', gap: 4 }}>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--gray)', marginBottom: 6 }}>Домашки</div>
+                <div style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>
+                  {m.hwDone}<span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600 }}>/{m.hwTotal}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>
+                  {Math.round((m.hwDone / m.hwTotal) * 100)}% сдано
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--gray)', marginBottom: 6 }}>Контрол.</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--blue)', lineHeight: 1 }}>{m.testAvg.toFixed(1)}</div>
+                <div style={{ fontSize: 11, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>средний</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--gray)', marginBottom: 6 }}>Посещаем.</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: pctColor(m.attendance), lineHeight: 1 }}>{m.attendance}%</div>
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -138,14 +170,14 @@ export default function SchoolYear() {
   }
 
   return (
-    <section style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 60px' }}>
+    <section className="year-section" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 60px' }}>
       <div className="fade-up">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <Chip>{student.examType} 2026</Chip>
           <Chip filled={false} small>Учебный год 2025/26</Chip>
         </div>
         <div style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ученик</div>
-        <h1 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0 }}>
+        <h1 className="year-title" style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0 }}>
           {student.name.split(' ')[0]}{' '}
           <span style={{ fontStyle: 'italic', color: 'var(--blue)' }}>{student.name.split(' ').slice(1).join(' ')}</span>
         </h1>

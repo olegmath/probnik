@@ -65,14 +65,14 @@ export default function SubjectStats({ subject }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'auto', padding: '0 18px 18px 0', scrollbarGutter: 'stable' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, flexShrink: 0 }}>
+      <div className="stats-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, flexShrink: 0 }}>
         {renderMetric('Средний итоговый', `${analytics.avgSecondary}/${maxSecondary}`, `${analytics.attempts.length} ${pluralizeAttempts(analytics.attempts.length)}`)}
         {renderMetric('Средний первичный', `${analytics.avgPrimary}/${getMaxScore(subject.name)}`, 'по всем работам')}
         {renderMetric('Лучший результат', analytics.bestAttempt ? `${analytics.bestAttempt.secondaryScore}/${maxSecondary}` : '0', analytics.bestAttempt?.date ? `пробник ${analytics.bestAttempt.date}` : 'лучший пробник', '#34b87a')}
         {renderMetric('Первый → последний', trendText, trendDetail, trendColor)}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)', gap: 12, minHeight: 0, alignItems: 'start', flexShrink: 0 }}>
+      <div className="stats-analysis-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)', gap: 12, minHeight: 0, alignItems: 'start', flexShrink: 0 }}>
         <div style={{ border: '2px solid var(--border)', borderRadius: 12, padding: 14, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Статистика по заданиям</div>
