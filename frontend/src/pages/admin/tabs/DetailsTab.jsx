@@ -67,7 +67,7 @@ export default function DetailsTab({ rows }) {
                 <Td>{r.group || '—'}</Td>
                 <Td right mono>{total ? `${days}/${total}` : days}</Td>
                 <Td right mono>{coef != null ? (coef * 100).toFixed(0) + '%' : '—'}</Td>
-                <Td right mono>{quality != null ? (quality * 100).toFixed(0) + '%' : '—'}</Td>
+                <Td right mono>{quality != null ? quality.toFixed(0) + '%' : '—'}</Td>
                 <Td right mono>{typeof score === 'number' ? score.toFixed(2) : score}</Td>
                 <Td right mono>
                   {editing ? (

@@ -2051,8 +2051,8 @@ def parse_attendance_xlsx(
             first_attempt_stats["lookups"] = first_attempt_stats.get("lookups", 0) + 1
 
         date_keys = [
-            iso_date(lesson_date, shift_days=DEADLINE_SHIFT_DAYS),
-            iso_date(lesson_date),
+            iso_date(lesson_date, shift_days=shift)
+            for shift in range(0, 8)
         ]
         student_keys = [
             f"id:{student_key(day.get('studentId'))}",
