@@ -1,5 +1,5 @@
-import { useState, Fragment } from 'react';
-import { Th, Td } from '../_helpers.jsx';
+import { useState, useMemo, Fragment } from 'react';
+import { SortTh, Td, sortRows } from '../_helpers.jsx';
 import { setPenaltyOverride } from '../../../lib/marathonApi.js';
 
 export default function DetailsTab({ rows }) {
@@ -7,6 +7,24 @@ export default function DetailsTab({ rows }) {
   const [saving, setSaving] = useState({});
   const [saveMsg, setSaveMsg] = useState({});
   const [expanded, setExpanded] = useState({});
+  const [sortKey, setSortKey] = useState('finalScore');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const normalizedRows = useMemo(() => rows.map((r) => ({
+    ...r,
+    _days: r.daysCompleted ?? r.days_completed ?? 0,
+    _coef: r.completionRate ?? r.completion_rate ?? 0,
+    _final: r.finalScore ?? r.final_score ?? r.score ?? 0,
+  })), [rows]);
+
+  const sortedRows = useMemo(() => sortRows(normalizedRows, sortKey === 'finalScore' ? '_final' : sortKey === 'coef' ? '_coef' : sortKey === 'days' ? '_days' : sortKey, sortDir), [normalizedRows, sortKey, sortDir]);
+
+  const s = { key: sortKey, dir: sortDir, on: handleSort };
 
   const toggleExpanded = (k) => setExpanded((prev) => ({ ...prev, [k]: !prev[k] }));
 
@@ -45,11 +63,20 @@ export default function DetailsTab({ rows }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'Inter' }}>
         <thead>
           <tr>
-            {['Ученик', 'Предмет', 'Группа', 'Дней', 'Коэф.', 'Качество', 'Балл', 'Штраф', 'Итоговый', ''].map((h, i) => <Th key={i} right={i >= 4 && i <= 8}>{h}</Th>)}
+            <SortTh sortKey="name" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Ученик</SortTh>
+            <SortTh sortKey="subject" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Предмет</SortTh>
+            <SortTh sortKey="group" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Группа</SortTh>
+            <SortTh sortKey="days" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Дней</SortTh>
+            <SortTh sortKey="coef" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Коэф.</SortTh>
+            <SortTh sortKey="quality" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Качество</SortTh>
+            <SortTh sortKey="score" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Балл</SortTh>
+            <SortTh sortKey="penalty" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Штраф</SortTh>
+            <SortTh sortKey="finalScore" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Итоговый</SortTh>
+            <th style={{ background: '#f8f8f8', borderBottom: '2px solid var(--border)' }} />
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {sortedRows.map((r) => {
             const k = rowKey(r);
             const editing = k in overrides;
             const days = r.daysCompleted ?? r.days_completed ?? '—';

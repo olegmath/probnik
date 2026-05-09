@@ -20,6 +20,29 @@ export function Th({ children, right }) {
   return <th style={{ padding: '8px 10px', textAlign: right ? 'right' : 'left', fontWeight: 900, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--black)', borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap', background: '#f8f8f8' }}>{children}</th>;
 }
 
+export function SortTh({ children, sortKey, currentKey, currentDir, onSort, right }) {
+  const active = currentKey === sortKey;
+  const arrow = active ? (currentDir === 'asc' ? ' ↑' : ' ↓') : '';
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      style={{ padding: '8px 10px', textAlign: right ? 'right' : 'left', fontWeight: 900, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: active ? 'var(--blue)' : 'var(--black)', borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap', background: '#f8f8f8', cursor: 'pointer', userSelect: 'none' }}
+    >
+      {children}{arrow}
+    </th>
+  );
+}
+
+export function sortRows(rows, key, dir) {
+  const d = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const av = a[key];
+    const bv = b[key];
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * d;
+    return String(av ?? '').localeCompare(String(bv ?? ''), 'ru') * d;
+  });
+}
+
 export function Td({ children, right, mono, bold }) {
   return <td style={{ padding: '8px 10px', textAlign: right ? 'right' : 'left', fontWeight: bold ? 900 : 600, fontSize: mono ? 13 : 12, fontVariantNumeric: mono ? 'tabular-nums' : 'normal', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}>{children}</td>;
 }

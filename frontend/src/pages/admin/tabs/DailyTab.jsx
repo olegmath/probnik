@@ -13,8 +13,10 @@ export default function DailyTab({ rows }) {
         <Sel label="Ученик" value={sel} onChange={setSel} options={students} placeholder="Выберите ученика" />
       </div>
       {sel && studentRows.map((r) => {
-        const dailyScores = r.dailyScores ?? r.daily_scores ?? {};
-        const days = Object.entries(dailyScores).sort(([a], [b]) => a.localeCompare(b));
+        const rawScores = r.dailyScores ?? r.daily_scores ?? [];
+        const days = (Array.isArray(rawScores) ? rawScores : Object.entries(rawScores).map(([dateKey, score]) => ({ dateKey, dateLabel: dateKey, score })))
+          .slice()
+          .sort((a, b) => (a.dateOrder ?? 0) - (b.dateOrder ?? 0) || (a.dateKey ?? '').localeCompare(b.dateKey ?? ''));
         return (
           <div key={`${r.subject}${r.level}`} style={{ marginBottom: 20, border: '2px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ padding: '10px 14px', background: '#f8fcfe', borderBottom: '1px solid var(--border)', fontWeight: 900, fontSize: 14 }}>{r.subject} {r.level} — итог: <span style={{ color: 'var(--blue)' }}>{(r.finalScore ?? r.final_score ?? 0).toFixed(2)}</span></div>
@@ -23,12 +25,14 @@ export default function DailyTab({ rows }) {
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'Inter' }}>
-                  <thead><tr><Th>Дата / день</Th><Th right>Баллы</Th></tr></thead>
+                  <thead><tr><Th>Дата / день</Th><Th right>Выполнено</Th><Th right>Баллы</Th><Th right>Опоздание</Th></tr></thead>
                   <tbody>
-                    {days.map(([day, score]) => (
-                      <tr key={day}>
-                        <Td>{day}</Td>
-                        <Td right mono bold>{typeof score === 'number' ? score.toFixed(2) : score}</Td>
+                    {days.map((d, i) => (
+                      <tr key={i}>
+                        <Td>{d.dateLabel || d.dateKey || '—'}</Td>
+                        <Td right>{d.completed ? '✓' : '—'}</Td>
+                        <Td right mono bold>{typeof d.score === 'number' ? d.score.toFixed(2) : (d.score ?? '—')}</Td>
+                        <Td right mono>{d.lateDays > 0 ? <span style={{ color: '#e05454' }}>+{d.lateDays}д</span> : '—'}</Td>
                       </tr>
                     ))}
                   </tbody>

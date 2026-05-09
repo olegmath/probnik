@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Sel, Th, Td } from '../_helpers.jsx';
+import { Sel, SortTh, Td, sortRows } from '../_helpers.jsx';
 import { getGroupErrors } from '../../../lib/marathonApi.js';
 
 export default function GroupErrorsTab({ allRows }) {
@@ -10,6 +10,13 @@ export default function GroupErrorsTab({ allRows }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sortKey, setSortKey] = useState('errorRate');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
 
   const subjects = useMemo(() => [...new Set(allRows.map((r) => r.subject).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [allRows]);
   const levels = useMemo(() => [...new Set(allRows.filter((r) => !subject || r.subject === subject).map((r) => r.level).filter(Boolean))].sort(), [allRows, subject]);
@@ -29,7 +36,19 @@ export default function GroupErrorsTab({ allRows }) {
     setLoading(false);
   };
 
-  const tasks = data?.tasks || data?.errors || [];
+  const rawTasks = data?.tasks || data?.errors || [];
+  const tasks = useMemo(() => {
+    const normalized = rawTasks.map((t, i) => ({
+      ...t,
+      _taskNum: t.task ?? t.taskNumber ?? t.number ?? i + 1,
+      _studentCount: t.studentCount ?? t.students ?? 0,
+      _errors: t.wrongTotal ?? t.errors ?? t.wrong ?? 0,
+      _errorRate: t.errorRate ?? 0,
+    }));
+    return sortRows(normalized, sortKey === 'taskNum' ? '_taskNum' : sortKey === 'studentCount' ? '_studentCount' : sortKey === 'errors' ? '_errors' : sortKey === 'errorRate' ? '_errorRate' : sortKey, sortDir);
+  }, [rawTasks, sortKey, sortDir]);
+
+  const s = { key: sortKey, dir: sortDir, on: handleSort };
 
   return (
     <div>
@@ -48,21 +67,21 @@ export default function GroupErrorsTab({ allRows }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'Inter' }}>
             <thead>
               <tr>
-                <Th>Задание</Th>
-                <Th>Тема</Th>
-                <Th right>Учеников</Th>
-                <Th right>Ошибок</Th>
-                <Th right>% ошибок</Th>
+                <SortTh sortKey="taskNum" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Задание</SortTh>
+                <SortTh sortKey="topic" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Тема</SortTh>
+                <SortTh sortKey="studentCount" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Учеников</SortTh>
+                <SortTh sortKey="errors" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Ошибок</SortTh>
+                <SortTh sortKey="errorRate" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>% ошибок</SortTh>
               </tr>
             </thead>
             <tbody>
               {tasks.map((t, i) => (
                 <tr key={i}>
-                  <Td bold>№{t.task ?? t.taskNumber ?? t.number ?? i + 1}</Td>
+                  <Td bold>№{t._taskNum}</Td>
                   <Td>{t.topic ?? t.theme ?? t.section ?? '—'}</Td>
-                  <Td right mono>{t.studentCount ?? t.students ?? '—'}</Td>
-                  <Td right mono bold>{t.wrongTotal ?? t.errors ?? t.wrong ?? 0}</Td>
-                  <Td right mono>{t.errorRate != null ? (t.errorRate * 100).toFixed(0) + '%' : '—'}</Td>
+                  <Td right mono>{t._studentCount || '—'}</Td>
+                  <Td right mono bold>{t._errors}</Td>
+                  <Td right mono>{t._errorRate != null ? (t._errorRate * 100).toFixed(0) + '%' : '—'}</Td>
                 </tr>
               ))}
             </tbody>
