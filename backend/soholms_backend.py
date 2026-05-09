@@ -2076,7 +2076,7 @@ def parse_attendance_xlsx(
         first_attempt_entry = first_attempt_for_day(day)
         if first_attempt_entry is not None:
             first_attempt_at, deadline_at = first_attempt_entry
-            lesson_late_days = 0 if first_attempt_at.date() <= deadline_at else 1
+            lesson_late_days = 0 if first_attempt_at.date() <= deadline_at else late_penalty(day.get("lessonDate"), first_attempt_at)
             previous_late_days = late_penalty(day.get("lessonDate"), submitted_at)
         else:
             first_attempt_at = None
@@ -2339,6 +2339,7 @@ def parse_xlsx_raw_rows(content: bytes) -> list[dict[str, Any]]:
     columns = {
         "name": header_index(headers, "Ученик", default=1),
         "group": header_index(headers, "Учебная группа", default=2),
+        "discipline": header_index(headers, "Дисциплина", default=3),
         "lesson_date": header_index(headers, "Дата урока", default=5),
         "lesson_score": header_index(headers, "Оценка за урок", default=8),
         "homework_score": header_index(headers, "Оценка за ДЗ", default=9),
@@ -2349,6 +2350,9 @@ def parse_xlsx_raw_rows(content: bytes) -> list[dict[str, Any]]:
     for row in worksheet.iter_rows(min_row=4, values_only=True):
         name = row_value(row, columns["name"])
         if not name:
+            continue
+        discipline = normalize_text(row_value(row, columns["discipline"]))
+        if discipline and "основн" not in discipline.casefold():
             continue
         date_key = iso_date(row_value(row, columns["lesson_date"]))
         if len(date_key) < 7:
@@ -3900,7 +3904,8 @@ class Handler(BaseHTTPRequestHandler):
                         "rows": [],
                         "snapshot": {"source": "admin-warming", "refreshing": True},
                     }
-                return self.send_json(payload, cache_seconds=60)
+                is_warming = not payload.get("rows")
+                return self.send_json(payload, cache_seconds=5 if is_warming else 60)
 
             if parsed.path == "/api/error-map":
                 return self.send_json(build_error_map_payload(query), cache_seconds=60)

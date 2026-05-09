@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('details');
   const [rawRows, setRawRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   const [subject, setSubject] = useState('');
@@ -31,9 +32,31 @@ export default function AdminDashboard() {
   const [group, setGroup] = useState('');
 
   useEffect(() => {
-    getRatings({ isPublic: false })
-      .then((res) => { setRawRows(res?.rows || []); setLoading(false); })
-      .catch((e) => { setError(e.message); setLoading(false); });
+    let pollTimer = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 15;
+
+    const load = (isRetry = false) => {
+      if (!isRetry) setLoading(true);
+      getRatings({ isPublic: false })
+        .then((res) => {
+          const rows = res?.rows || [];
+          setRawRows(rows);
+          if (rows.length === 0 && res?.snapshot?.refreshing && attempts < MAX_ATTEMPTS) {
+            attempts++;
+            setLoading(false);
+            setRefreshing(true);
+            pollTimer = setTimeout(() => load(true), 8000);
+          } else {
+            setLoading(false);
+            setRefreshing(false);
+          }
+        })
+        .catch((e) => { setError(e.message); setLoading(false); setRefreshing(false); });
+    };
+
+    load();
+    return () => { if (pollTimer) clearTimeout(pollTimer); };
   }, []);
 
   const handleLogout = () => {
@@ -62,7 +85,7 @@ export default function AdminDashboard() {
           <svg width="40" height="40" viewBox="0 0 48 48" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px', display: 'block' }}>
             <circle cx="24" cy="24" r="20" stroke="var(--blue)" strokeWidth="4" fill="none" strokeDasharray="31.4 62.8" />
           </svg>
-          <p style={{ fontWeight: 700 }}>Загрузка данных...</p>
+          <p style={{ fontWeight: 700 }}>Загрузка данных марафона...</p>
         </div>
       </div>
     );
@@ -93,6 +116,15 @@ export default function AdminDashboard() {
           <span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600 }}>{rawRows.length} учеников</span>
         </div>
       </div>
+
+      {refreshing && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 16px', background: '#eef4ff', border: '2px solid var(--blue)', borderRadius: 10 }}>
+          <svg width="16" height="16" viewBox="0 0 48 48" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
+            <circle cx="24" cy="24" r="20" stroke="var(--blue)" strokeWidth="4" fill="none" strokeDasharray="31.4 62.8" />
+          </svg>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)' }}>Данные марафона обновляются, подождите…</span>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {TABS.map((tab) => {
