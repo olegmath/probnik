@@ -175,11 +175,11 @@ a {
   /* General padding */
   .page-pad { padding: 20px 16px !important; }
 
-  /* ── Task theme text — 1 line with ellipsis ── */
+  /* ── Task theme text — full wrap ── */
   .task-theme-text {
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
   }
 
   /* ── ThemeAnalysis zones — horizontal rows on mobile ── */
@@ -192,12 +192,12 @@ a {
   .zone-btn-meta { display: none !important; }
   .zone-btn-footer { margin-top: 0 !important; flex-shrink: 0; }
 
-  /* ── Subject filter buttons — 3-column grid ── */
+  /* ── Subject filter buttons — 2-column grid ── */
   .subject-filter-grid {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: repeat(2, 1fr) !important;
   }
-  .subject-filter-grid button { width: 100% !important; text-align: center !important; }
+  .subject-filter-grid button { width: 100% !important; text-align: center !important; white-space: normal !important; line-height: 1.3 !important; }
 
   /* ── Subjects page ── */
   .subjects-main { padding: 20px 16px !important; overflow: visible !important; }
@@ -207,6 +207,11 @@ a {
   .subj-primary  { display: none !important; }
 
   /* ── SubjectStats ── */
+  .subject-stats-outer {
+    padding: 0 0 18px 0 !important;
+    scrollbar-gutter: auto !important;
+    overflow-x: hidden !important;
+  }
   .stats-metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }

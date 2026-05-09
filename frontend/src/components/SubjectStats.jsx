@@ -64,7 +64,7 @@ export default function SubjectStats({ subject }) {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'auto', padding: '0 18px 18px 0', scrollbarGutter: 'stable' }}>
+    <div className="subject-stats-outer" style={{ display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0, overflow: 'auto', padding: '0 18px 18px 0', scrollbarGutter: 'stable' }}>
       <div className="stats-metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, flexShrink: 0 }}>
         {renderMetric('Средний итоговый', `${analytics.avgSecondary}/${maxSecondary}`, `${analytics.attempts.length} ${pluralizeAttempts(analytics.attempts.length)}`)}
         {renderMetric('Средний первичный', `${analytics.avgPrimary}/${getMaxScore(subject.name)}`, 'по всем работам')}
