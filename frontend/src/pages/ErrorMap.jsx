@@ -33,12 +33,25 @@ function AttemptDots({ attempts = [] }) {
 }
 
 function getQuestionTaskLabel(q) {
-  const plan = q?.plannedTask || null;
-  return plan?.label || String(Number(q?.number || 0) || '');
+  return String(Number(q?.number || 0) || q?.plannedTask?.label || '');
+}
+function getQuestionExamLabel(q) {
+  return q?.plannedTask?.label || '';
 }
 function getQuestionTaskKey(q) {
   const plan = q?.plannedTask || null;
   return plan?.key || getQuestionTaskLabel(q);
+}
+function formatTaskLabel(q, examWord) {
+  const main = getQuestionTaskLabel(q);
+  const real = getQuestionExamLabel(q);
+  if (real && real !== main) return `№${main} (${examWord} №${real})`;
+  return `№${main}`;
+}
+function pickExamWord(student) {
+  const t = (student?.examType || '').toUpperCase();
+  if (t.includes('ОГЭ')) return 'в ОГЭ';
+  return 'в ЕГЭ';
 }
 function getQuestionSortNumber(q) {
   const plan = q?.plannedTask || null;
@@ -51,9 +64,10 @@ function getQuestionTopicNote(q, fallbackPlan = null) {
   return [section, topic].filter(Boolean).join(' · ');
 }
 
-function buildErrorMapAnalytics(days) {
+function buildErrorMapAnalytics(days, examWord = 'в ЕГЭ') {
   const taskMap = new Map();
   for (const day of days) {
+    if (day.completed === false) continue;
     for (const item of day.maps || []) {
       for (const question of item.questions || []) {
         const taskKey = getQuestionTaskKey(question);
@@ -61,6 +75,7 @@ function buildErrorMapAnalytics(days) {
         const task = taskMap.get(taskKey) || {
           key: taskKey,
           number: getQuestionTaskLabel(question),
+          examNumber: getQuestionExamLabel(question),
           sortNumber: getQuestionSortNumber(question),
           topicNote: getQuestionTopicNote(question, item.marathonPlan || day.marathonPlan),
           days: new Set(),
@@ -86,7 +101,13 @@ function buildErrorMapAnalytics(days) {
     b.wrongAttempts - a.wrongAttempts || a.sortNumber - b.sortNumber ||
     String(a.number || '').localeCompare(String(b.number || ''), 'ru');
 
-  const tasks = [...taskMap.values()].map((t) => ({ ...t, dayLabels: [...t.days] }));
+  const tasks = [...taskMap.values()].map((t) => ({
+    ...t,
+    dayLabels: [...t.days],
+    label: t.examNumber && t.examNumber !== t.number
+      ? `№${t.number} (${examWord} №${t.examNumber})`
+      : `№${t.number}`,
+  }));
   const remainingTasks = tasks.filter((t) => t.remaining > 0).sort(byPriority);
   const frequentErrors = tasks
     .filter((t) => t.wrongHomeworks >= 2 || t.wrongAttempts >= 3)
@@ -94,17 +115,21 @@ function buildErrorMapAnalytics(days) {
   const fixedTasks = tasks
     .filter((t) => t.fixed > 0 && t.remaining === 0)
     .sort((a, b) => b.fixed - a.fixed || a.sortNumber - b.sortNumber);
-  const cleanDays = days.filter((day) => (day.maps || []).length > 0 && (day.maps || []).every((item) => Number(item.summary?.wrongTotal || 0) === 0));
+  const cleanDays = days.filter((day) =>
+    day.completed !== false
+    && (day.maps || []).length > 0
+    && (day.maps || []).every((item) => Number(item.summary?.wrongTotal || 0) === 0)
+  );
 
   const recommendations = [];
   if (remainingTasks.length > 0) {
-    recommendations.push(`Сначала закрыть задания ${remainingTasks.slice(0, 4).map((t) => `№${t.number}`).join(', ')}: там ещё есть неисправленные ошибки.`);
+    recommendations.push(`Сначала закрыть задания ${remainingTasks.slice(0, 4).map((t) => t.label).join(', ')}: там ещё есть неисправленные ошибки.`);
   }
   if (frequentErrors.length > 0) {
-    recommendations.push(`Отдельно повторить частые ошибки: ${frequentErrors.slice(0, 4).map((t) => `№${t.number}`).join(', ')}.`);
+    recommendations.push(`Отдельно повторить частые ошибки: ${frequentErrors.slice(0, 4).map((t) => t.label).join(', ')}.`);
   }
   if (fixedTasks.length > 0) {
-    recommendations.push(`Закрепить уже исправленное: ${fixedTasks.slice(0, 4).map((t) => `№${t.number}`).join(', ')} лучше дать в короткой повторной практике.`);
+    recommendations.push(`Закрепить уже исправленное: ${fixedTasks.slice(0, 4).map((t) => t.label).join(', ')} лучше дать в короткой повторной практике.`);
   }
   if (cleanDays.length > 0) {
     recommendations.push(`Есть дни без ошибок в проверенных попытках: ${cleanDays.slice(0, 2).map((d) => d.title || d.dateLabel || `день ${d.dayOrder || '?'}`).join(', ')}.`);
@@ -126,7 +151,7 @@ function TaskGroup({ title, tasks, color, emptyText }) {
       <div style={{ fontSize: 11, fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.07em', color, marginBottom: 8 }}>{title}</div>
       {visible.length > 0 ? visible.map((task) => (
         <div key={task.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ background: color, color: '#fff', borderRadius: 6, padding: '2px 8px', fontWeight: 900, fontSize: 12, whiteSpace: 'nowrap' }}>№{task.number}</span>
+          <span style={{ background: color, color: '#fff', borderRadius: 6, padding: '2px 8px', fontWeight: 900, fontSize: 12, whiteSpace: 'nowrap' }}>{task.label || `№${task.number}`}</span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray)', lineHeight: 1.2, overflowWrap: 'anywhere' }}>
               {task.topicNote || task.dayLabels.slice(0, 2).join(', ') || 'по карте ошибок'}
@@ -141,8 +166,8 @@ function TaskGroup({ title, tasks, color, emptyText }) {
   );
 }
 
-function ErrorInsights({ days }) {
-  const analytics = buildErrorMapAnalytics(days);
+function ErrorInsights({ days, examWord }) {
+  const analytics = buildErrorMapAnalytics(days, examWord);
   if (!analytics.tasks.length) return null;
 
   return (
@@ -171,7 +196,7 @@ function ErrorInsights({ days }) {
   );
 }
 
-function DayCard({ day }) {
+function DayCard({ day, examWord }) {
   const subMaps = day.maps || [];
   const questions = subMaps.flatMap((item) =>
     (item.questions || []).map((q) => ({ ...q, marathonPlan: item.marathonPlan || day.marathonPlan || null }))
@@ -191,11 +216,7 @@ function DayCard({ day }) {
 
   const status = getStatus();
 
-  const getTaskLabel = (q) => {
-    if (q.plannedTask?.label) return q.plannedTask.label;
-    if (q.marathonPlan?.label) return q.marathonPlan.label;
-    return q.number ? `${q.number}` : '?';
-  };
+  const getTaskLabel = (q) => formatTaskLabel(q, examWord);
 
   const getTopicNote = (q) => {
     const mp = q.marathonPlan;
@@ -248,7 +269,7 @@ function DayCard({ day }) {
               <tbody>
                 {questions.map((q, i) => (
                   <tr key={q.number ?? i} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '9px 10px', fontWeight: 900, fontSize: 13 }}>№{getTaskLabel(q)}</td>
+                    <td style={{ padding: '9px 10px', fontWeight: 900, fontSize: 13 }}>{getTaskLabel(q)}</td>
                     <td style={{ padding: '9px 10px', color: 'var(--gray)', fontWeight: 600, maxWidth: 220 }}>{getTopicNote(q) || '—'}</td>
                     <td style={{ padding: '9px 10px' }}><AttemptDots attempts={q.attempts || []} /></td>
                     <td style={{ padding: '9px 10px', fontWeight: 900, textAlign: 'center' }}>{Number(q.wrongAttempts || 0)}</td>
@@ -275,6 +296,7 @@ export default function ErrorMap() {
 
   const [activeSubject, setActiveSubject] = useState(subjects[0] || '');
   const [maps, setMaps] = useState([]);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -283,25 +305,29 @@ export default function ErrorMap() {
     setLoading(true);
     setError('');
     setMaps([]);
+    setSummary(null);
     getErrorMap({ studentName: student.name, subject: activeSubject, level: student.examType })
-      .then((res) => { setMaps(res?.maps || []); setLoading(false); })
+      .then((res) => { setMaps(res?.maps || []); setSummary(res?.summary || null); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [student?.name, activeSubject]);
 
   if (!student) return <div style={{ padding: 40 }}>Ученик не найден</div>;
 
-  const totalErrors = maps.reduce((s, d) => {
+  const examWord = pickExamWord(student);
+  const examShort = examWord.replace('в ', '');
+  const totalErrors = summary?.totalErrors ?? maps.reduce((s, d) => {
     const sub = d.maps || [];
     return s + sub.reduce((ss, m) => ss + Number(m.summary?.wrongTotal || 0), 0);
   }, 0);
-  const totalFixed = maps.reduce((s, d) => {
+  const totalFixed = summary?.fixed ?? maps.reduce((s, d) => {
     const sub = d.maps || [];
     return s + sub.reduce((ss, m) => ss + Number(m.summary?.fixed || 0), 0);
   }, 0);
-  const totalRemaining = maps.reduce((s, d) => {
+  const totalRemaining = summary?.remaining ?? maps.reduce((s, d) => {
     const sub = d.maps || [];
     return s + sub.reduce((ss, m) => ss + Number(m.summary?.remaining || 0), 0);
   }, 0);
+  const unfinishedDays = summary?.unfinishedDays ?? maps.filter((d) => d.completed === false).length;
 
   return (
     <main style={{ maxWidth: 1000, margin: '0 auto', width: '100%', padding: '32px 24px' }}>
@@ -356,11 +382,16 @@ export default function ErrorMap() {
 
       {!loading && !error && maps.length > 0 && (
         <>
+          <div style={{ border: '2px solid var(--blue)', background: 'rgba(140,192,220,0.10)', borderRadius: 12, padding: '12px 16px', marginBottom: 18, fontSize: 13, fontWeight: 700, color: 'var(--black)', lineHeight: 1.4 }}>
+            <span style={{ fontWeight: 900 }}>Как читать карту.</span>{' '}
+            Все задания в марафоне — это <i>прототипы</i> реальных задач {examShort}. Если рядом с номером в скобках указан номер «({examWord} №…)», то это номер соответствующей задачи в реальном экзамене.
+          </div>
           <div style={{ display: 'flex', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
             {[
               { label: 'Всего ошибок', value: totalErrors, color: 'var(--black)', border: 'var(--border)' },
               { label: 'Исправлено', value: totalFixed, color: '#34b87a', border: '#34b87a' },
               ...(totalRemaining > 0 ? [{ label: 'Осталось', value: totalRemaining, color: '#e05454', border: '#e05454' }] : []),
+              ...(unfinishedDays > 0 ? [{ label: 'Не выполнено', value: `${unfinishedDays} дн.`, color: '#B46C00', border: '#f5a623' }] : []),
             ].map(({ label, value, color, border }) => (
               <div key={label} style={{ border: `2px solid ${border}`, borderRadius: 12, padding: '10px 18px', minWidth: 110 }}>
                 <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)' }}>{label}</div>
@@ -368,9 +399,9 @@ export default function ErrorMap() {
               </div>
             ))}
           </div>
-          <ErrorInsights days={maps} />
+          <ErrorInsights days={maps} examWord={examWord} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {maps.map((day, i) => <DayCard key={day.dayOrder ?? day.dayKey ?? day.dateKey ?? i} day={day} />)}
+            {maps.map((day, i) => <DayCard key={day.dayOrder ?? day.dayKey ?? day.dateKey ?? i} day={day} examWord={examWord} />)}
           </div>
         </>
       )}
