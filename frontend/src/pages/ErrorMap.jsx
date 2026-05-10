@@ -186,7 +186,7 @@ function TaskStatistics({ analytics }) {
 function Recommendations({ analytics }) {
   if (!analytics.recommendations?.length) return null;
   return (
-    <div style={{ border: '2px solid var(--black)', borderRadius: 12, padding: 16, marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ border: '2px solid var(--black)', borderRadius: 12, padding: 16, marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>На что обратить внимание</div>
       {analytics.recommendations.map((text, i) => (
         <div key={`rec-${i}`} style={{ display: 'grid', gridTemplateColumns: '22px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
@@ -406,10 +406,10 @@ export default function ErrorMap() {
             return (
               <>
                 <TaskStatistics analytics={analytics} />
+                <Recommendations analytics={analytics} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {maps.map((day, i) => <DayCard key={day.dayOrder ?? day.dayKey ?? day.dateKey ?? i} day={day} examWord={examWord} />)}
                 </div>
-                <Recommendations analytics={analytics} />
               </>
             );
           })()}
