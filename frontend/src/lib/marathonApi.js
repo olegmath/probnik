@@ -82,8 +82,8 @@ export async function getGradesSummary({ periodFrom = '2025-09-01', periodTo = '
   return apiFetch('/api/grades-summary', { periodFrom, periodTo }, true);
 }
 
-export async function getStudentJournal(name, subject = '', from = '2025-09-01', to = '2026-05-31') {
-  return apiFetch('/api/student-journal', { name, subject, from, to });
+export async function getStudentJournal(name, from = '2025-09-01', to = '2026-05-31') {
+  return apiFetch('/api/student-journal', { name, from, to });
 }
 
 export async function getJournalSummary({ mode = 'students', periodFrom = '2025-09-01', periodTo = '2026-05-31' } = {}) {

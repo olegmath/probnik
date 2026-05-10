@@ -38,6 +38,11 @@ function formatDate(iso) {
   return `${m[3]}.${m[2]}.${m[1].slice(2)}`;
 }
 
+function capitalize(s) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function SummaryCard({ label, value, note, color }) {
   return (
     <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: '16px 20px', background: 'white' }}>
@@ -79,10 +84,6 @@ function RankPill({ label, place, of }) {
 
 function OverviewTab({ data }) {
   const { attendance, homework, kr, integral, flags, ranks } = data;
-  const monthLabels = (attendance.by_month || []).map((m) => m.month);
-  const monthAttPct = (attendance.by_month || []).map((m) => m.pct);
-
-  // KR/HW sparkline points (sorted by date)
   const hwPoints = [...(homework.trend || [])].map((h) => h.grade);
   const krPoints = [...(kr.list || [])].map((k) => k.grade);
 
@@ -90,7 +91,7 @@ function OverviewTab({ data }) {
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         <RankPill label="в группе" place={ranks?.in_group?.place} of={ranks?.in_group?.of} />
-        <RankPill label="в школе" place={ranks?.in_school?.place} of={ranks?.in_school?.of} />
+        <RankPill label="в предмете" place={ranks?.in_school?.place} of={ranks?.in_school?.of} />
       </div>
 
       <FlagsRow flags={flags} />
@@ -349,37 +350,47 @@ function EmptyState() {
   );
 }
 
+function PillBtn({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        border: active ? '2px solid var(--black)' : '2px solid var(--border)',
+        background: active ? 'var(--black)' : 'var(--white)',
+        color: active ? 'var(--white)' : 'var(--black)',
+        borderRadius: 100,
+        padding: '8px 18px',
+        cursor: 'pointer',
+        fontFamily: 'Inter',
+        fontSize: 13,
+        fontWeight: 800,
+        transition: 'all 0.15s',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function SchoolYear() {
   const { id } = useParams();
   const { state } = useLocation();
   const { allStudents } = useProbnik();
   const [tab, setTab] = useState('overview');
+  const [subjectIdx, setSubjectIdx] = useState(0);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const student = state?.student || allStudents[safeDecode(id)];
 
-  const primarySubject = (() => {
-    const subjects = student?.subjects;
-    if (!subjects || !subjects.length) return '';
-    const primary = subjects.reduce((a, b) => (a.attempts.length >= b.attempts.length ? a : b));
-    const n = primary.name.toLowerCase();
-    if (n.includes('матем')) return 'математика';
-    if (n.includes('рус')) return 'русский язык';
-    if (n.includes('физ')) return 'физика';
-    if (n.includes('инф')) return 'информатика';
-    if (n.includes('общ')) return 'обществознание';
-    if (n.includes('ист')) return 'история';
-    return '';
-  })();
-
   useEffect(() => {
     if (!student) return;
     setLoading(true);
     setError(null);
     setData(null);
-    getStudentJournal(student.name, primarySubject)
+    setSubjectIdx(0);
+    getStudentJournal(student.name)
       .then((res) => {
         if (res.ok) {
           setData(res);
@@ -389,7 +400,7 @@ export default function SchoolYear() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [student?.name, primarySubject]);
+  }, [student?.name]);
 
   if (!student) {
     return (
@@ -402,14 +413,17 @@ export default function SchoolYear() {
     );
   }
 
-  const renderTab = () => {
+  const subjects = data?.subjects || [];
+  const activeSubject = subjects[subjectIdx] || null;
+
+  const renderContent = () => {
     if (loading) return <LoadingState />;
     if (error) return <ErrorState message={error} />;
-    if (!data) return <EmptyState />;
-    if (tab === 'overview') return <OverviewTab data={data} />;
-    if (tab === 'homework') return <HomeworkTab data={data} />;
-    if (tab === 'tests') return <TestsTab data={data} />;
-    if (tab === 'attendance') return <AttendanceTab data={data} />;
+    if (!data || !activeSubject) return <EmptyState />;
+    if (tab === 'overview') return <OverviewTab data={activeSubject} />;
+    if (tab === 'homework') return <HomeworkTab data={activeSubject} />;
+    if (tab === 'tests') return <TestsTab data={activeSubject} />;
+    if (tab === 'attendance') return <AttendanceTab data={activeSubject} />;
     return null;
   };
 
@@ -419,7 +433,6 @@ export default function SchoolYear() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <Chip>{student.examType} 2026</Chip>
           <Chip filled={false} small>Учебный год 2025/26</Chip>
-          {data?.group && <Chip filled={false} small>{data.group}</Chip>}
         </div>
         <div style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ученик</div>
         <h1 className="year-title" style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0 }}>
@@ -428,33 +441,41 @@ export default function SchoolYear() {
         </h1>
         <div style={{ fontSize: 14, color: 'var(--gray)', marginTop: 8, fontWeight: 500 }}>{student.grade} класс</div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 28, marginBottom: 24 }}>
-          {TABS.map((t) => {
-            const active = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{
-                  border: active ? '2px solid var(--black)' : '2px solid var(--border)',
-                  background: active ? 'var(--black)' : 'var(--white)',
-                  color: active ? 'var(--white)' : 'var(--black)',
-                  borderRadius: 100,
-                  padding: '8px 18px',
-                  cursor: 'pointer',
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  fontWeight: 800,
-                  transition: 'all 0.15s',
-                }}
+        {/* Subject selector — shown only when multiple subjects */}
+        {subjects.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 24 }}>
+            {subjects.map((s, i) => (
+              <PillBtn
+                key={s.subject + s.group}
+                active={i === subjectIdx}
+                onClick={() => { setSubjectIdx(i); setTab('overview'); }}
               >
-                {t.label}
-              </button>
-            );
-          })}
+                {capitalize(s.subject) || s.group}
+              </PillBtn>
+            ))}
+          </div>
+        )}
+
+        {/* Group label for active subject */}
+        {activeSubject && (
+          <div style={{ marginTop: subjects.length > 1 ? 8 : 24, marginBottom: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Chip filled={false} small>{activeSubject.group}</Chip>
+            {activeSubject.teacher && (
+              <span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600 }}>{activeSubject.teacher}</span>
+            )}
+          </div>
+        )}
+
+        {/* Content tabs */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16, marginBottom: 24 }}>
+          {TABS.map((t) => (
+            <PillBtn key={t.id} active={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.label}
+            </PillBtn>
+          ))}
         </div>
 
-        {renderTab()}
+        {renderContent()}
       </div>
     </section>
   );
