@@ -61,7 +61,7 @@ export async function getGroupErrors({ subject, level, teacher, group } = {}) {
 }
 
 export async function clearCache() {
-  return apiFetch('/api/admin/clear-cache', {}, true);
+  return apiFetch('/api/cache/clear', {}, true);
 }
 
 export async function setPenaltyOverride({ studentName, subject, level, penalty } = {}) {
