@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { useProbnik } from '../lib/ProbnikProvider.jsx';
 import { safeDecode } from '../lib/safeDecode';
-import { getStudentYear } from '../lib/marathonApi.js';
+import { getStudentJournal } from '../lib/marathonApi.js';
 import Chip from '../components/ui/Chip.jsx';
+import LineSpark from '../components/charts/LineSpark.jsx';
 
 const TABS = [
   { id: 'overview', label: 'Общая' },
@@ -13,131 +14,297 @@ const TABS = [
 ];
 
 function pctColor(pct) {
-  if (pct >= 95) return 'var(--blue)';
-  if (pct >= 80) return 'var(--black)';
+  if (pct == null) return 'var(--gray)';
+  if (pct >= 85) return '#16a34a';
+  if (pct >= 70) return 'var(--black)';
+  if (pct >= 60) return '#f59e0b';
   return '#e05';
 }
 
-function OverviewTable({ months, summary, loading, error }) {
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--gray)', fontSize: 14, fontWeight: 600 }}>
-        Загружаем данные…
-      </div>
-    );
-  }
+function fmtPct(v, digits = 1) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return `${v.toFixed(digits)}%`;
+}
 
-  if (error) {
-    return (
-      <div style={{ border: '2px solid #e05', borderRadius: 12, padding: '16px 20px', color: '#e05', fontSize: 14, fontWeight: 700 }}>
-        Ошибка загрузки: {error}
-      </div>
-    );
-  }
+function fmtNum(v, digits = 1) {
+  if (v == null || !Number.isFinite(v)) return '—';
+  return v.toFixed(digits);
+}
 
-  if (!months || months.length === 0) {
-    return (
-      <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '40px 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: 14, color: 'var(--gray)', fontWeight: 600 }}>Данные за этот период недоступны</div>
-      </div>
-    );
-  }
+function formatDate(iso) {
+  if (!iso) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${m[3]}.${m[2]}.${m[1].slice(2)}`;
+}
+
+function SummaryCard({ label, value, note, color }) {
+  return (
+    <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: '16px 20px', background: 'white' }}>
+      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)' }}>{label}</div>
+      <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: '-0.02em', marginTop: 4, color: color || 'var(--black)' }}>{value}</div>
+      {note && <div style={{ fontSize: 12, color: 'var(--gray)', fontWeight: 600, marginTop: 2 }}>{note}</div>}
+    </div>
+  );
+}
+
+function FlagsRow({ flags }) {
+  if (!flags || flags.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+      {flags.map((f, i) => (
+        <span key={i} style={{
+          background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
+          padding: '6px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700,
+        }}>{f}</span>
+      ))}
+    </div>
+  );
+}
+
+function RankPill({ label, place, of }) {
+  if (!place || !of) return null;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'baseline', gap: 6,
+      background: 'var(--black)', color: 'var(--white)',
+      padding: '6px 14px', borderRadius: 999, fontSize: 13, fontWeight: 700,
+    }}>
+      <span style={{ opacity: 0.7, fontSize: 11 }}>{label}</span>
+      <span style={{ fontSize: 16, fontWeight: 900 }}>{place}</span>
+      <span style={{ opacity: 0.6 }}>/ {of}</span>
+    </span>
+  );
+}
+
+function OverviewTab({ data }) {
+  const { attendance, homework, kr, integral, flags, ranks } = data;
+  const monthLabels = (attendance.by_month || []).map((m) => m.month);
+  const monthAttPct = (attendance.by_month || []).map((m) => m.pct);
+
+  // KR/HW sparkline points (sorted by date)
+  const hwPoints = [...(homework.trend || [])].map((h) => h.grade);
+  const krPoints = [...(kr.list || [])].map((k) => k.grade);
 
   return (
     <div>
-      <div className="year-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        <RankPill label="в группе" place={ranks?.in_group?.place} of={ranks?.in_group?.of} />
+        <RankPill label="в школе" place={ranks?.in_school?.place} of={ranks?.in_school?.of} />
+      </div>
+
+      <FlagsRow flags={flags} />
+
+      <div className="year-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
         <SummaryCard
-          label="Домашки"
-          value={`${summary.hwDone}/${summary.hwTotal}`}
-          note={summary.hwTotal > 0 ? `${Math.round((summary.hwDone / summary.hwTotal) * 100)}% сдано` : 'нет данных'}
-        />
-        <SummaryCard
-          label="Контрольные"
-          value={summary.testAvg != null ? summary.testAvg.toFixed(1) : '—'}
-          note="средний балл"
+          label="Интеграл"
+          value={fmtNum(integral, 1)}
+          note="средняя по 3 метрикам"
+          color={pctColor(integral)}
         />
         <SummaryCard
           label="Посещаемость"
-          value={`${summary.attendancePct}%`}
-          note="средняя за год"
+          value={fmtPct(attendance.pct, 0)}
+          note={`был ${attendance.was} / ${attendance.total}`}
+          color={pctColor(attendance.pct)}
+        />
+        <SummaryCard
+          label="Среднее ДЗ"
+          value={fmtPct(homework.avg, 0)}
+          note={`${homework.count} оценок`}
+          color={pctColor(homework.avg)}
+        />
+        <SummaryCard
+          label="Среднее КР"
+          value={fmtPct(kr.avg, 0)}
+          note={`${kr.count} КР`}
+          color={pctColor(kr.avg)}
         />
       </div>
 
-      {/* Desktop table */}
-      <div className="year-table-desktop" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
-          <Th>Месяц</Th>
-          <Th>Домашки</Th>
-          <Th>Контрольные</Th>
-          <Th>Посещаемость</Th>
+      <div className="year-trend-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 24 }}>
+        <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: 16, background: 'white' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', marginBottom: 8 }}>Тренд ДЗ</div>
+          <LineSpark points={hwPoints} width={320} height={70} color="#2563eb" />
         </div>
-        {months.map((m, i) => (
-          <div
-            key={m.month}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1.5fr 1fr 1fr 1fr',
-              borderTop: i === 0 ? 'none' : '1px solid var(--border)',
-              background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
-            }}
-          >
+        <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: 16, background: 'white' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', marginBottom: 8 }}>Тренд КР</div>
+          <LineSpark points={krPoints} width={320} height={70} color="#dc2626" />
+        </div>
+      </div>
+
+      <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+          <Th>Месяц</Th>
+          <Th>Был / Не был</Th>
+          <Th>Посещ.</Th>
+          <Th>Болел</Th>
+        </div>
+        {(attendance.by_month || []).map((m, i) => (
+          <div key={m.monthKey} style={{
+            display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr',
+            borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+            background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
+          }}>
             <Td><span style={{ fontWeight: 800 }}>{m.month}</span></Td>
             <Td>
-              <span style={{ fontWeight: 800 }}>{m.hwDone}</span>
-              <span style={{ color: 'var(--gray)', fontWeight: 600 }}> / {m.hwTotal}</span>
+              <span style={{ fontWeight: 800 }}>{m.was}</span>
+              <span style={{ color: 'var(--gray)', fontWeight: 600 }}> / {m.absent}</span>
             </Td>
-            <Td>
-              <span style={{ fontWeight: 800, color: 'var(--blue)' }}>
-                {m.testAvg != null ? m.testAvg.toFixed(1) : '—'}
-              </span>
-            </Td>
-            <Td><span style={{ fontWeight: 800, color: pctColor(m.attendance) }}>{m.attendance}%</span></Td>
+            <Td><span style={{ fontWeight: 800, color: pctColor(m.pct) }}>{Math.round(m.pct)}%</span></Td>
+            <Td><span style={{ color: m.sick > 0 ? 'var(--black)' : 'var(--gray)', fontWeight: 700 }}>{m.sick}</span></Td>
           </div>
         ))}
       </div>
 
-      {/* Mobile cards */}
-      <div className="year-month-cards">
-        {months.map((m) => (
-          <div key={m.month} style={{ border: '1.5px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
-            <div style={{ background: 'var(--black)', color: 'var(--white)', padding: '10px 16px', fontSize: 13, fontWeight: 900, letterSpacing: '-0.01em' }}>
-              {m.month}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '14px 16px', gap: 4 }}>
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--gray)', marginBottom: 6 }}>Домашки</div>
-                <div style={{ fontSize: 20, fontWeight: 900, lineHeight: 1 }}>
-                  {m.hwDone}<span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600 }}>/{m.hwTotal}</span>
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>
-                  {m.hwTotal > 0 ? `${Math.round((m.hwDone / m.hwTotal) * 100)}% сдано` : 'нет ДЗ'}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--gray)', marginBottom: 6 }}>Контрол.</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--blue)', lineHeight: 1 }}>
-                  {m.testAvg != null ? m.testAvg.toFixed(1) : '—'}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>средний</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--gray)', marginBottom: 6 }}>Посещаем.</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: pctColor(m.attendance), lineHeight: 1 }}>{m.attendance}%</div>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div style={{ marginTop: 8, fontSize: 12, color: 'var(--gray)', fontWeight: 500 }}>
+        ДЗ и КР нормализованы по максимуму группы за каждую работу.
       </div>
     </div>
   );
 }
 
-function SummaryCard({ label, value, note }) {
+function HomeworkTab({ data }) {
+  const { homework } = data;
+  const trend = homework.trend || [];
+  const points = trend.map((h) => h.grade);
+  const labels = trend.map((h) => h.no != null ? `№${h.no}` : '?');
+
   return (
-    <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: '16px 20px', background: 'white' }}>
-      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)' }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: '-0.02em', marginTop: 4, color: 'var(--black)' }}>{value}</div>
-      <div style={{ fontSize: 12, color: 'var(--gray)', fontWeight: 600, marginTop: 2 }}>{note}</div>
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+        <SummaryCard label="Среднее" value={fmtPct(homework.avg, 0)} note={`${homework.count} оценок`} color={pctColor(homework.avg)} />
+        <SummaryCard label="Принято" value={fmtPct(homework.done_pct, 0)} note="заданий из всех" />
+        <SummaryCard label="Не открыто" value={fmtPct(homework.not_opened_pct, 0)} note="заданий" color={homework.not_opened_pct >= 30 ? '#dc2626' : 'var(--black)'} />
+      </div>
+
+      <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: 16, background: 'white', marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', marginBottom: 8 }}>Тренд по номеру ДЗ</div>
+        <LineSpark points={points} labels={labels} width={680} height={90} color="#2563eb" />
+      </div>
+
+      {trend.length === 0 ? (
+        <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет ДЗ с оценками</div>
+      ) : (
+        <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '60px 2fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+            <Th>№</Th>
+            <Th>Тема</Th>
+            <Th>%</Th>
+            <Th>Балл</Th>
+            <Th>Дата</Th>
+          </div>
+          {trend.map((h, i) => (
+            <div key={i} style={{
+              display: 'grid', gridTemplateColumns: '60px 2fr 1fr 1fr 1fr',
+              borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+              background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
+            }}>
+              <Td><span style={{ fontWeight: 800 }}>{h.no ?? '—'}</span></Td>
+              <Td><span style={{ fontSize: 13 }}>{h.lesson}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: pctColor(h.grade) }}>{h.grade.toFixed(0)}%</span></Td>
+              <Td><span style={{ fontFamily: 'monospace', color: 'var(--gray)' }}>{h.raw}/{h.max}</span></Td>
+              <Td><span style={{ fontSize: 12, color: 'var(--gray)' }}>{formatDate(h.date)}</span></Td>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TestsTab({ data }) {
+  const { kr } = data;
+  const list = kr.list || [];
+  const points = list.map((k) => k.grade);
+  const labels = list.map((k) => formatDate(k.date));
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
+        <SummaryCard label="Средний КР" value={fmtPct(kr.avg, 0)} note={`${kr.count} работ`} color={pctColor(kr.avg)} />
+        <SummaryCard label="Лучшая" value={list.length ? `${Math.round(Math.max(...points))}%` : '—'} note="за год" />
+      </div>
+
+      <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: 16, background: 'white', marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', marginBottom: 8 }}>Динамика</div>
+        <LineSpark points={points} labels={labels} width={680} height={90} color="#dc2626" />
+      </div>
+
+      {list.length === 0 ? (
+        <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет КР с оценками</div>
+      ) : (
+        <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+            <Th>Тема</Th>
+            <Th>%</Th>
+            <Th>Балл</Th>
+            <Th>Дата</Th>
+          </div>
+          {list.map((k, i) => (
+            <div key={i} style={{
+              display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr',
+              borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+              background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
+            }}>
+              <Td><span style={{ fontSize: 13 }}>{k.lesson}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: pctColor(k.grade) }}>{k.grade.toFixed(0)}%</span></Td>
+              <Td><span style={{ fontFamily: 'monospace', color: 'var(--gray)' }}>{k.raw}/{k.max}</span></Td>
+              <Td><span style={{ fontSize: 12, color: 'var(--gray)' }}>{formatDate(k.date)}</span></Td>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AttendanceTab({ data }) {
+  const { attendance } = data;
+  const months = attendance.by_month || [];
+  const points = months.map((m) => m.pct);
+  const labels = months.map((m) => m.month);
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+        <SummaryCard label="Был" value={attendance.was} color="#16a34a" note={`из ${attendance.total} занятий`} />
+        <SummaryCard label="Не был" value={attendance.absent} color={attendance.absent > 5 ? '#dc2626' : 'var(--black)'} />
+        <SummaryCard label="Болел" value={attendance.sick} color="var(--black)" />
+        <SummaryCard label="Подряд пропусков" value={attendance.max_streak} color={attendance.max_streak >= 3 ? '#dc2626' : 'var(--black)'} note="максимум" />
+      </div>
+
+      <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: 16, background: 'white', marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', marginBottom: 8 }}>% посещений по месяцам</div>
+        <LineSpark points={points} labels={labels} width={680} height={90} color="#16a34a" />
+      </div>
+
+      {months.length === 0 ? (
+        <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет данных о посещениях</div>
+      ) : (
+        <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+            <Th>Месяц</Th>
+            <Th>Был</Th>
+            <Th>Не был</Th>
+            <Th>Болел</Th>
+            <Th>Посещ.</Th>
+          </div>
+          {months.map((m, i) => (
+            <div key={m.monthKey} style={{
+              display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr',
+              borderTop: i === 0 ? 'none' : '1px solid var(--border)',
+              background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
+            }}>
+              <Td><span style={{ fontWeight: 800 }}>{m.month}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: '#16a34a' }}>{m.was}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: m.absent > 0 ? '#dc2626' : 'var(--gray)' }}>{m.absent}</span></Td>
+              <Td><span style={{ color: 'var(--gray)', fontWeight: 700 }}>{m.sick}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: pctColor(m.pct) }}>{Math.round(m.pct)}%</span></Td>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -158,14 +325,26 @@ function Td({ children }) {
   );
 }
 
-function ComingSoon({ title, description }) {
+function LoadingState() {
   return (
-    <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '60px 24px', textAlign: 'center', background: 'white' }}>
-      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--gray)', marginBottom: 8 }}>Скоро</div>
-      <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', marginBottom: 12 }}>{title}</div>
-      <div style={{ fontSize: 14, color: 'var(--gray)', fontWeight: 500, maxWidth: 460, margin: '0 auto', lineHeight: 1.5 }}>
-        {description}
-      </div>
+    <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--gray)', fontSize: 14, fontWeight: 600 }}>
+      Загружаем данные…
+    </div>
+  );
+}
+
+function ErrorState({ message }) {
+  return (
+    <div style={{ border: '2px solid #e05', borderRadius: 12, padding: '16px 20px', color: '#e05', fontSize: 14, fontWeight: 700 }}>
+      Ошибка загрузки: {message}
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '40px 24px', textAlign: 'center' }}>
+      <div style={{ fontSize: 14, color: 'var(--gray)', fontWeight: 600 }}>Данные за этот период недоступны</div>
     </div>
   );
 }
@@ -175,29 +354,43 @@ export default function SchoolYear() {
   const { state } = useLocation();
   const { allStudents } = useProbnik();
   const [tab, setTab] = useState('overview');
-  const [months, setMonths] = useState(null);
-  const [summary, setSummary] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const student = state?.student || allStudents[safeDecode(id)];
 
+  const primarySubject = (() => {
+    if (!student?.subjects) return '';
+    const entries = Object.entries(student.subjects);
+    if (!entries.length) return '';
+    const [name] = entries.reduce((a, b) => (a[1].attempts.length >= b[1].attempts.length ? a : b));
+    const n = name.toLowerCase();
+    if (n.includes('матем')) return 'математика';
+    if (n.includes('рус')) return 'русский язык';
+    if (n.includes('физ')) return 'физика';
+    if (n.includes('инф')) return 'информатика';
+    if (n.includes('общ')) return 'обществознание';
+    if (n.includes('ист')) return 'история';
+    return '';
+  })();
+
   useEffect(() => {
     if (!student) return;
     setLoading(true);
     setError(null);
-    getStudentYear(student.name)
-      .then((data) => {
-        if (data.ok) {
-          setMonths(data.months);
-          setSummary(data.summary);
+    setData(null);
+    getStudentJournal(student.name, primarySubject)
+      .then((res) => {
+        if (res.ok) {
+          setData(res);
         } else {
-          setError(data.error || 'Данные недоступны');
+          setError(res.error || 'Данные недоступны');
         }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [student?.name]);
+  }, [student?.name, primarySubject]);
 
   if (!student) {
     return (
@@ -210,12 +403,24 @@ export default function SchoolYear() {
     );
   }
 
+  const renderTab = () => {
+    if (loading) return <LoadingState />;
+    if (error) return <ErrorState message={error} />;
+    if (!data) return <EmptyState />;
+    if (tab === 'overview') return <OverviewTab data={data} />;
+    if (tab === 'homework') return <HomeworkTab data={data} />;
+    if (tab === 'tests') return <TestsTab data={data} />;
+    if (tab === 'attendance') return <AttendanceTab data={data} />;
+    return null;
+  };
+
   return (
     <section className="year-section" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 60px' }}>
       <div className="fade-up">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <Chip>{student.examType} 2026</Chip>
           <Chip filled={false} small>Учебный год 2025/26</Chip>
+          {data?.group && <Chip filled={false} small>{data.group}</Chip>}
         </div>
         <div style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ученик</div>
         <h1 className="year-title" style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0 }}>
@@ -250,27 +455,7 @@ export default function SchoolYear() {
           })}
         </div>
 
-        {tab === 'overview' && (
-          <OverviewTable months={months} summary={summary} loading={loading} error={error} />
-        )}
-        {tab === 'homework' && (
-          <ComingSoon
-            title="Домашки в деталях"
-            description="Здесь появится разбор каждой домашки по неделям: статус (сдано / в работе / просрочено), оценка, комментарии преподавателя."
-          />
-        )}
-        {tab === 'tests' && (
-          <ComingSoon
-            title="Контрольные работы"
-            description="Список всех контрольных за год с темами, баллами, разбором ошибок и динамикой прогресса."
-          />
-        )}
-        {tab === 'attendance' && (
-          <ComingSoon
-            title="Посещаемость"
-            description="Календарь занятий с отметками присутствия, списком пропусков и причинами."
-          />
-        )}
+        {renderTab()}
       </div>
     </section>
   );

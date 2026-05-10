@@ -82,6 +82,14 @@ export async function getGradesSummary({ periodFrom = '2025-09-01', periodTo = '
   return apiFetch('/api/grades-summary', { periodFrom, periodTo }, true);
 }
 
+export async function getStudentJournal(name, subject = '', from = '2025-09-01', to = '2026-05-31') {
+  return apiFetch('/api/student-journal', { name, subject, from, to });
+}
+
+export async function getJournalSummary({ mode = 'students', periodFrom = '2025-09-01', periodTo = '2026-05-31' } = {}) {
+  return apiFetch('/api/journal-summary', { mode, periodFrom, periodTo }, true);
+}
+
 export async function sendTelegramReport({ studentName, subject, level } = {}) {
   const res = await fetch(`${BASE_URL}/api/telegram/send-report`, {
     method: 'POST',
