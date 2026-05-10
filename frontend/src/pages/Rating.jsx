@@ -174,9 +174,9 @@ export default function Rating() {
     const sorted = [...filteredRows].sort((a, b) => (b.finalScore ?? b.score ?? 0) - (a.finalScore ?? a.score ?? 0));
     let currentPlace = 0;
     let prevScore = null;
-    const ranked = sorted.map((r, i) => {
+    const ranked = sorted.map((r) => {
       const score = r.finalScore ?? r.score ?? 0;
-      if (score !== prevScore) { currentPlace = i + 1; prevScore = score; }
+      if (score !== prevScore) { currentPlace += 1; prevScore = score; }
       return { ...r, place: currentPlace };
     });
     return {
