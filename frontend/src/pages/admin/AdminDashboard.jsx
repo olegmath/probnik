@@ -108,7 +108,7 @@ export default function AdminDashboard() {
   const showFilters = activeTab === 'details' || activeTab === 'teachers' || activeTab === 'daily' || activeTab === 'grades';
 
   return (
-    <main style={{ maxWidth: 1300, margin: '0 auto', width: '100%', padding: '28px 24px' }}>
+    <main style={{ maxWidth: 1800, margin: '0 auto', width: '100%', padding: '28px 24px' }}>
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Административная панель</div>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
