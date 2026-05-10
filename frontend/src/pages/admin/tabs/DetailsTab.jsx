@@ -17,8 +17,8 @@ export default function DetailsTab({ rows }) {
 
   const normalizedRows = useMemo(() => rows.map((r) => ({
     ...r,
-    _days: r.daysCompleted ?? r.days_completed ?? 0,
-    _coef: r.completionRate ?? r.completion_rate ?? 0,
+    _days: r.daysDone ?? r.daysCompleted ?? r.days_completed ?? 0,
+    _coef: r.coefficient ?? r.completionRate ?? r.completion_rate ?? 0,
     _final: r.finalScore ?? r.final_score ?? r.score ?? 0,
   })), [rows]);
 
@@ -66,12 +66,15 @@ export default function DetailsTab({ rows }) {
             <SortTh sortKey="name" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Ученик</SortTh>
             <SortTh sortKey="subject" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Предмет</SortTh>
             <SortTh sortKey="group" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Группа</SortTh>
+            <SortTh sortKey="teacher" currentKey={s.key} currentDir={s.dir} onSort={s.on}>Преподаватель</SortTh>
             <SortTh sortKey="days" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Дней</SortTh>
             <SortTh sortKey="coef" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Коэф.</SortTh>
             <SortTh sortKey="quality" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Качество</SortTh>
             <SortTh sortKey="score" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Балл</SortTh>
             <SortTh sortKey="penalty" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Штраф</SortTh>
             <SortTh sortKey="finalScore" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>Итоговый</SortTh>
+            <SortTh sortKey="groupPlace" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>М. группе</SortTh>
+            <SortTh sortKey="schoolPlace" currentKey={s.key} currentDir={s.dir} onSort={s.on} right>М. школе</SortTh>
             <th style={{ background: '#f8f8f8', borderBottom: '2px solid var(--border)' }} />
           </tr>
         </thead>
@@ -79,9 +82,9 @@ export default function DetailsTab({ rows }) {
           {sortedRows.map((r) => {
             const k = rowKey(r);
             const editing = k in overrides;
-            const days = r.daysCompleted ?? r.days_completed ?? '—';
-            const total = r.totalDays ?? r.total_days ?? '';
-            const coef = r.completionRate ?? r.completion_rate;
+            const days = r.daysDone ?? r.daysCompleted ?? r.days_completed ?? '—';
+            const total = r.daysTotal ?? r.totalDays ?? r.total_days ?? '';
+            const coef = r.coefficient ?? r.completionRate ?? r.completion_rate;
             const quality = r.quality;
             const score = r.score ?? 0;
             const penalty = r.penalty ?? 0;
@@ -92,6 +95,7 @@ export default function DetailsTab({ rows }) {
                 <Td bold>{r.name}</Td>
                 <Td>{r.subject} {r.level}</Td>
                 <Td>{r.group || '—'}</Td>
+                <Td>{r.teacher || '—'}</Td>
                 <Td right mono>{total ? `${days}/${total}` : days}</Td>
                 <Td right mono>{coef != null ? (coef * 100).toFixed(0) + '%' : '—'}</Td>
                 <Td right mono>{quality != null ? quality.toFixed(0) + '%' : '—'}</Td>
@@ -110,6 +114,8 @@ export default function DetailsTab({ rows }) {
                   )}
                 </Td>
                 <Td right mono bold>{typeof final === 'number' ? final.toFixed(2) : final}</Td>
+                <Td right mono>{r.groupPlace || '—'}</Td>
+                <Td right mono>{r.schoolPlace || '—'}</Td>
                 <Td>
                   {saveMsg[k] && <span style={{ fontSize: 11, fontWeight: 700, color: saveMsg[k] === 'Сохранено' ? '#34b87a' : '#e05454', marginRight: 6 }}>{saveMsg[k]}</span>}
                   {editing ? (
@@ -131,7 +137,7 @@ export default function DetailsTab({ rows }) {
               </tr>
               {expanded[k] && (
                 <tr>
-                  <td colSpan={10} style={{ background: '#fff8f8', padding: '4px 16px 12px 32px', borderBottom: '1px solid var(--border)' }}>
+                  <td colSpan={13} style={{ background: '#fff8f8', padding: '4px 16px 12px 32px', borderBottom: '1px solid var(--border)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, fontFamily: 'Inter' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid #eee' }}>

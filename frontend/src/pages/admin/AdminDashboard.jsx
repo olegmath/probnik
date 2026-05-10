@@ -30,6 +30,8 @@ export default function AdminDashboard() {
   const [level, setLevel] = useState('');
   const [teacher, setTeacher] = useState('');
   const [group, setGroup] = useState('');
+  const [periodFrom, setPeriodFrom] = useState('');
+  const [periodTo, setPeriodTo] = useState('');
 
   useEffect(() => {
     let pollTimer = null;
@@ -38,7 +40,7 @@ export default function AdminDashboard() {
 
     const load = (isRetry = false) => {
       if (!isRetry) setLoading(true);
-      getRatings({ isPublic: false })
+      getRatings({ isPublic: false, periodFrom, periodTo })
         .then((res) => {
           const rows = res?.rows || [];
           setRawRows(rows);
@@ -57,7 +59,7 @@ export default function AdminDashboard() {
 
     load();
     return () => { if (pollTimer) clearTimeout(pollTimer); };
-  }, []);
+  }, [periodFrom, periodTo]);
 
   const handleLogout = () => {
     clearAdminKey();
@@ -137,19 +139,46 @@ export default function AdminDashboard() {
         })}
       </div>
 
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)' }}>С</div>
+          <input type="date" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)}
+            style={{ height: 36, padding: '0 10px', border: '2px solid var(--border)', borderRadius: 8, fontFamily: 'Inter', fontSize: 13, fontWeight: 700, color: 'var(--black)', background: 'var(--white)', outline: 'none', cursor: 'pointer' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)' }}>ПО</div>
+          <input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)}
+            style={{ height: 36, padding: '0 10px', border: '2px solid var(--border)', borderRadius: 8, fontFamily: 'Inter', fontSize: 13, fontWeight: 700, color: 'var(--black)', background: 'var(--white)', outline: 'none', cursor: 'pointer' }} />
+        </div>
+        {(periodFrom || periodTo) && (
+          <button onClick={() => { setPeriodFrom(''); setPeriodTo(''); }}
+            style={{ height: 36, padding: '0 12px', border: '2px solid var(--border)', borderRadius: 8, background: 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'var(--gray)', alignSelf: 'flex-end' }}>
+            Сбросить период
+          </button>
+        )}
+      </div>
+
       {showFilters && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {/* Строка 1: Предмет */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', minWidth: 64 }}>Предмет</span>
             {subjects.map((s) => pill(s, subject === s, () => { setSubject(subject === s ? '' : s); setLevel(''); setTeacher(''); setGroup(''); }))}
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* Строка 2: Экзамен */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', minWidth: 64 }}>Экзамен</span>
             {levels.map((l) => pill(l, level === l, () => { setLevel(level === l ? '' : l); setTeacher(''); setGroup(''); }, 'var(--blue)'))}
           </div>
-          {teachers.length > 0 && <Sel value={teacher} onChange={(v) => { setTeacher(v); setGroup(''); }} options={teachers} placeholder="Все преподаватели" />}
-          {teacher && groups.length > 0 && <Sel value={group} onChange={setGroup} options={groups} placeholder="Все группы" />}
-          {(subject || level || teacher || group) && (
-            <button onClick={resetFilters} style={{ height: 36, padding: '0 12px', border: '2px solid var(--border)', borderRadius: 8, background: 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'var(--gray)', alignSelf: 'flex-end' }}>Сбросить</button>
-          )}
+          {/* Строка 3: Преподаватель + Группа + Сбросить */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', minWidth: 64 }}>Препод.</span>
+            {teachers.length > 0 && <Sel value={teacher} onChange={(v) => { setTeacher(v); setGroup(''); }} options={teachers} placeholder="Все преподаватели" />}
+            {teacher && groups.length > 0 && <Sel value={group} onChange={setGroup} options={groups} placeholder="Все группы" />}
+            {(subject || level || teacher || group) && (
+              <button onClick={resetFilters} style={{ height: 36, padding: '0 12px', border: '2px solid var(--border)', borderRadius: 8, background: 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'var(--gray)' }}>Сбросить</button>
+            )}
+          </div>
         </div>
       )}
 
