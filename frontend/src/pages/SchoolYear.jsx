@@ -361,11 +361,10 @@ export default function SchoolYear() {
   const student = state?.student || allStudents[safeDecode(id)];
 
   const primarySubject = (() => {
-    if (!student?.subjects) return '';
-    const entries = Object.entries(student.subjects);
-    if (!entries.length) return '';
-    const [name] = entries.reduce((a, b) => (a[1].attempts.length >= b[1].attempts.length ? a : b));
-    const n = name.toLowerCase();
+    const subjects = student?.subjects;
+    if (!subjects || !subjects.length) return '';
+    const primary = subjects.reduce((a, b) => (a.attempts.length >= b.attempts.length ? a : b));
+    const n = primary.name.toLowerCase();
     if (n.includes('матем')) return 'математика';
     if (n.includes('рус')) return 'русский язык';
     if (n.includes('физ')) return 'физика';
