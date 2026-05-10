@@ -12,7 +12,7 @@ export default function LineSpark({
   const valid = points.filter((p) => p != null && Number.isFinite(p));
   if (!valid.length) {
     return (
-      <div style={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>
+      <div style={{ width: '100%', maxWidth: width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>
         нет данных
       </div>
     );
@@ -45,7 +45,11 @@ export default function LineSpark({
   if (current.length) segments.push(current);
 
   return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block', width: '100%', maxWidth: width, height: 'auto' }}
+    >
       {showAxis && (
         <line
           x1={padX}
@@ -65,11 +69,12 @@ export default function LineSpark({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
         />
       ))}
       {showDots && coords.map((c, i) => c && (
         <g key={i}>
-          <circle cx={c.x} cy={c.y} r="3" fill={color}>
+          <circle cx={c.x} cy={c.y} r="3" fill={color} vectorEffect="non-scaling-stroke">
             <title>{labels ? `${labels[i]}: ${c.v}` : c.v}</title>
           </circle>
         </g>

@@ -134,15 +134,15 @@ function OverviewTab({ data }) {
         </div>
       </div>
 
-      <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+      <div className="gt-table-scroll" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+        <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
           <Th>Месяц</Th>
           <Th>Был / Не был</Th>
           <Th>Посещ.</Th>
           <Th>Болел</Th>
         </div>
         {(attendance.by_month || []).map((m, i) => (
-          <div key={m.monthKey} style={{
+          <div key={m.monthKey} className="gt-table-row" style={{
             display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr',
             borderTop: i === 0 ? 'none' : '1px solid var(--border)',
             background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
@@ -173,7 +173,7 @@ function HomeworkTab({ data }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div className="gt-summary-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         <SummaryCard label="Среднее" value={fmtPct(homework.avg, 0)} note={`${homework.count} оценок`} color={pctColor(homework.avg)} />
         <SummaryCard label="Принято" value={fmtPct(homework.done_pct, 0)} note="заданий из всех" />
         <SummaryCard label="Не открыто" value={fmtPct(homework.not_opened_pct, 0)} note="заданий" color={homework.not_opened_pct >= 30 ? '#dc2626' : 'var(--black)'} />
@@ -187,8 +187,8 @@ function HomeworkTab({ data }) {
       {trend.length === 0 ? (
         <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет ДЗ с оценками</div>
       ) : (
-        <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '60px 2fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+        <div className="gt-table-scroll" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+          <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '60px 2fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
             <Th>№</Th>
             <Th>Тема</Th>
             <Th>%</Th>
@@ -196,7 +196,7 @@ function HomeworkTab({ data }) {
             <Th>Дата</Th>
           </div>
           {trend.map((h, i) => (
-            <div key={i} style={{
+            <div key={i} className="gt-table-row" style={{
               display: 'grid', gridTemplateColumns: '60px 2fr 1fr 1fr 1fr',
               borderTop: i === 0 ? 'none' : '1px solid var(--border)',
               background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
@@ -222,7 +222,7 @@ function TestsTab({ data }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div className="gt-summary-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
         <SummaryCard label="Средний КР" value={fmtPct(kr.avg, 0)} note={`${kr.count} работ`} color={pctColor(kr.avg)} />
         <SummaryCard label="Лучшая" value={list.length ? `${Math.round(Math.max(...points))}%` : '—'} note="за год" />
       </div>
@@ -235,15 +235,15 @@ function TestsTab({ data }) {
       {list.length === 0 ? (
         <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет КР с оценками</div>
       ) : (
-        <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+        <div className="gt-table-scroll" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+          <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
             <Th>Тема</Th>
             <Th>%</Th>
             <Th>Балл</Th>
             <Th>Дата</Th>
           </div>
           {list.map((k, i) => (
-            <div key={i} style={{
+            <div key={i} className="gt-table-row" style={{
               display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr 1fr',
               borderTop: i === 0 ? 'none' : '1px solid var(--border)',
               background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
@@ -268,7 +268,7 @@ function AttendanceTab({ data }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div className="gt-summary-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
         <SummaryCard label="Был" value={attendance.was} color="#16a34a" note={`из ${attendance.total} занятий`} />
         <SummaryCard label="Не был" value={attendance.absent} color={attendance.absent > 5 ? '#dc2626' : 'var(--black)'} />
         <SummaryCard label="Болел" value={attendance.sick} color="var(--black)" />
@@ -283,8 +283,8 @@ function AttendanceTab({ data }) {
       {months.length === 0 ? (
         <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет данных о посещениях</div>
       ) : (
-        <div style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+        <div className="gt-table-scroll" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
+          <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
             <Th>Месяц</Th>
             <Th>Был</Th>
             <Th>Не был</Th>
@@ -292,7 +292,7 @@ function AttendanceTab({ data }) {
             <Th>Посещ.</Th>
           </div>
           {months.map((m, i) => (
-            <div key={m.monthKey} style={{
+            <div key={m.monthKey} className="gt-table-row" style={{
               display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr',
               borderTop: i === 0 ? 'none' : '1px solid var(--border)',
               background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
