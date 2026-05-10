@@ -45,7 +45,7 @@ function getQuestionTaskKey(q) {
 function formatTaskLabel(q, examWord) {
   const main = getQuestionTaskLabel(q);
   const real = getQuestionExamLabel(q);
-  if (real && real !== main) return `№${main} (${examWord} №${real})`;
+  if (real) return `№${main} (${examWord} №${real})`;
   return `№${main}`;
 }
 function pickExamWord(student) {
@@ -104,7 +104,7 @@ function buildErrorMapAnalytics(days, examWord = 'в ЕГЭ') {
   const tasks = [...taskMap.values()].map((t) => ({
     ...t,
     dayLabels: [...t.days],
-    label: t.examNumber && t.examNumber !== t.number
+    label: t.examNumber
       ? `№${t.number} (${examWord} №${t.examNumber})`
       : `№${t.number}`,
   }));
@@ -166,32 +166,34 @@ function TaskGroup({ title, tasks, color, emptyText }) {
   );
 }
 
-function ErrorInsights({ days, examWord }) {
-  const analytics = buildErrorMapAnalytics(days, examWord);
+function TaskStatistics({ analytics }) {
   if (!analytics.tasks.length) return null;
-
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
-      <div style={{ flex: '2 1 400px', border: '2px solid var(--border)', borderRadius: 12, padding: 14, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Статистика по заданиям</div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--gray)' }}>по всем проверенным попыткам</div>
-        </div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          <TaskGroup title="Нужно исправить" tasks={analytics.remainingTasks} color="#e05454" emptyText="Неисправленных ошибок нет" />
-          <TaskGroup title="Частые ошибки" tasks={analytics.frequentErrors} color="#f5a623" emptyText="Повторяющихся ошибок пока нет" />
-          <TaskGroup title="Исправлено" tasks={analytics.fixedTasks} color="#34b87a" emptyText="Исправленных ошибок пока нет" />
-        </div>
+    <div style={{ border: '2px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 22, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Статистика по заданиям</div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--gray)' }}>по всем проверенным попыткам</div>
       </div>
-      <div style={{ flex: '1 1 220px', border: '2px solid var(--black)', borderRadius: 12, padding: 14, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>На что обратить внимание</div>
-        {analytics.recommendations.map((text, i) => (
-          <div key={`rec-${i}`} style={{ display: 'grid', gridTemplateColumns: '22px minmax(0,1fr)', gap: 8, alignItems: 'start' }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', background: i === 0 ? 'var(--blue)' : '#f5f5f5', color: i === 0 ? 'var(--white)' : 'var(--black)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 950 }}>{i + 1}</div>
-            <div style={{ fontSize: 13, fontWeight: 750, lineHeight: 1.28, overflowWrap: 'anywhere' }}>{text}</div>
-          </div>
-        ))}
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+        <TaskGroup title="Нужно исправить" tasks={analytics.remainingTasks} color="#e05454" emptyText="Неисправленных ошибок нет" />
+        <TaskGroup title="Частые ошибки" tasks={analytics.frequentErrors} color="#f5a623" emptyText="Повторяющихся ошибок пока нет" />
+        <TaskGroup title="Исправлено" tasks={analytics.fixedTasks} color="#34b87a" emptyText="Исправленных ошибок пока нет" />
       </div>
+    </div>
+  );
+}
+
+function Recommendations({ analytics }) {
+  if (!analytics.recommendations?.length) return null;
+  return (
+    <div style={{ border: '2px solid var(--black)', borderRadius: 12, padding: 16, marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: '0.08em', textTransform: 'uppercase' }}>На что обратить внимание</div>
+      {analytics.recommendations.map((text, i) => (
+        <div key={`rec-${i}`} style={{ display: 'grid', gridTemplateColumns: '22px minmax(0,1fr)', gap: 10, alignItems: 'start' }}>
+          <div style={{ width: 22, height: 22, borderRadius: '50%', background: i === 0 ? 'var(--blue)' : '#f5f5f5', color: i === 0 ? 'var(--white)' : 'var(--black)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 950 }}>{i + 1}</div>
+          <div style={{ fontSize: 13, fontWeight: 750, lineHeight: 1.28, overflowWrap: 'anywhere' }}>{text}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -399,10 +401,18 @@ export default function ErrorMap() {
               </div>
             ))}
           </div>
-          <ErrorInsights days={maps} examWord={examWord} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {maps.map((day, i) => <DayCard key={day.dayOrder ?? day.dayKey ?? day.dateKey ?? i} day={day} examWord={examWord} />)}
-          </div>
+          {(() => {
+            const analytics = buildErrorMapAnalytics(maps, examWord);
+            return (
+              <>
+                <TaskStatistics analytics={analytics} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {maps.map((day, i) => <DayCard key={day.dayOrder ?? day.dayKey ?? day.dateKey ?? i} day={day} examWord={examWord} />)}
+                </div>
+                <Recommendations analytics={analytics} />
+              </>
+            );
+          })()}
         </>
       )}
 
