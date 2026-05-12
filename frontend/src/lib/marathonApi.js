@@ -64,13 +64,16 @@ export async function clearCache() {
   return apiFetch('/api/cache/clear', {}, true);
 }
 
-export async function setPenaltyOverride({ studentName, subject, level, penalty } = {}) {
+export async function setPenaltyOverride({ name, subject, level, group, teacher, periodFrom, periodTo, penalty, autoPenalty } = {}) {
   const res = await fetch(`${BASE_URL}/api/penalty-override`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...adminHeaders() },
-    body: JSON.stringify({ studentName, subject, level, penalty }),
+    body: JSON.stringify({ name, subject, level, group, teacher, periodFrom, periodTo, penalty, autoPenalty }),
   });
-  if (!res.ok) throw new Error(`Marathon API /api/penalty-override → ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Marathon API /api/penalty-override → ${res.status}${detail ? ` ${detail}` : ''}`);
+  }
   return res.json();
 }
 

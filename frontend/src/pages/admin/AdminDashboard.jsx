@@ -22,6 +22,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('details');
   const [rawRows, setRawRows] = useState([]);
+  const [period, setPeriod] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -44,6 +45,7 @@ export default function AdminDashboard() {
         .then((res) => {
           const rows = res?.rows || [];
           setRawRows(rows);
+          if (res?.period) setPeriod(res.period);
           if (rows.length === 0 && res?.snapshot?.refreshing && attempts < MAX_ATTEMPTS) {
             attempts++;
             setLoading(false);
@@ -184,7 +186,7 @@ export default function AdminDashboard() {
 
       <div style={{ height: 2, background: 'var(--black)', borderRadius: 2, marginBottom: 16 }} />
 
-      {activeTab === 'details' && <DetailsTab rows={filteredRows} />}
+      {activeTab === 'details' && <DetailsTab rows={filteredRows} period={period} />}
       {activeTab === 'teachers' && <TeachersTab rows={filteredRows} />}
       {activeTab === 'daily' && <DailyTab rows={filteredRows} />}
       {activeTab === 'grades' && <GradesTab subject={subject} level={level} teacher={teacher} group={group} />}

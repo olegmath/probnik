@@ -2,7 +2,7 @@ import { useState, useMemo, Fragment } from 'react';
 import { SortTh, Td, sortRows } from '../_helpers.jsx';
 import { setPenaltyOverride } from '../../../lib/marathonApi.js';
 
-export default function DetailsTab({ rows }) {
+export default function DetailsTab({ rows, period }) {
   const [overrides, setOverrides] = useState({});
   const [saving, setSaving] = useState({});
   const [saveMsg, setSaveMsg] = useState({});
@@ -46,11 +46,22 @@ export default function DetailsTab({ rows }) {
     if (isNaN(penalty)) return;
     setSaving((prev) => ({ ...prev, [k]: true }));
     try {
-      await setPenaltyOverride({ studentName: r.name, subject: r.subject, level: r.level, penalty });
+      await setPenaltyOverride({
+        name: r.name,
+        subject: r.subject,
+        level: r.level,
+        group: r.group ?? '',
+        teacher: r.teacher ?? '',
+        periodFrom: period?.from ?? '',
+        periodTo: period?.to ?? '',
+        penalty,
+        autoPenalty: r.autoPenalty ?? r.penalty ?? penalty,
+      });
       setSaveMsg((prev) => ({ ...prev, [k]: 'Сохранено' }));
       cancelEdit(r);
       setTimeout(() => setSaveMsg((prev) => { const n = { ...prev }; delete n[k]; return n; }), 2000);
     } catch (e) {
+      console.error('penalty-override failed:', e);
       setSaveMsg((prev) => ({ ...prev, [k]: 'Ошибка' }));
     }
     setSaving((prev) => ({ ...prev, [k]: false }));
