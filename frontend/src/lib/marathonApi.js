@@ -93,11 +93,11 @@ export async function getJournalSummary({ mode = 'students', periodFrom = '2025-
   return apiFetch('/api/journal-summary', { mode, periodFrom, periodTo }, true);
 }
 
-export async function sendTelegramReport({ studentName, subject, level } = {}) {
+export async function sendTelegramReport({ studentName, subject, level, format = 'pdf' } = {}) {
   const res = await fetch(`${BASE_URL}/api/telegram/send-report`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...adminHeaders() },
-    body: JSON.stringify({ studentName, subject, level }),
+    body: JSON.stringify({ studentName, subject, level, format }),
   });
   if (!res.ok) throw new Error(`Marathon API /api/telegram/send-report → ${res.status}`);
   return res.json();
