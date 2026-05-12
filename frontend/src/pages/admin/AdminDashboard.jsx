@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getRatings, clearAdminKey } from '../../lib/marathonApi.js';
 import { pill, Sel } from './_helpers.jsx';
@@ -61,6 +61,16 @@ export default function AdminDashboard() {
 
     load();
     return () => { if (pollTimer) clearTimeout(pollTimer); };
+  }, [periodFrom, periodTo]);
+
+  // Silent one-shot refetch (e.g. after saving a penalty override).
+  const reloadRatings = useCallback(() => {
+    return getRatings({ isPublic: false, periodFrom, periodTo })
+      .then((res) => {
+        setRawRows(res?.rows || []);
+        if (res?.period) setPeriod(res.period);
+      })
+      .catch(() => {});
   }, [periodFrom, periodTo]);
 
   const handleLogout = () => {
@@ -186,7 +196,7 @@ export default function AdminDashboard() {
 
       <div style={{ height: 2, background: 'var(--black)', borderRadius: 2, marginBottom: 16 }} />
 
-      {activeTab === 'details' && <DetailsTab rows={filteredRows} period={period} />}
+      {activeTab === 'details' && <DetailsTab rows={filteredRows} period={period} onSaved={reloadRatings} />}
       {activeTab === 'teachers' && <TeachersTab rows={filteredRows} />}
       {activeTab === 'daily' && <DailyTab rows={filteredRows} />}
       {activeTab === 'grades' && <GradesTab subject={subject} level={level} teacher={teacher} group={group} />}

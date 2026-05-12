@@ -2,7 +2,7 @@ import { useState, useMemo, Fragment } from 'react';
 import { SortTh, Td, sortRows } from '../_helpers.jsx';
 import { setPenaltyOverride } from '../../../lib/marathonApi.js';
 
-export default function DetailsTab({ rows, period }) {
+export default function DetailsTab({ rows, period, onSaved }) {
   const [overrides, setOverrides] = useState({});
   const [saving, setSaving] = useState({});
   const [saveMsg, setSaveMsg] = useState({});
@@ -60,6 +60,8 @@ export default function DetailsTab({ rows, period }) {
       setSaveMsg((prev) => ({ ...prev, [k]: 'Сохранено' }));
       cancelEdit(r);
       setTimeout(() => setSaveMsg((prev) => { const n = { ...prev }; delete n[k]; return n; }), 2000);
+      // Backend rebuilds the ratings snapshot in the background; give it a moment, then refetch.
+      if (onSaved) setTimeout(() => { onSaved(); }, 2500);
     } catch (e) {
       console.error('penalty-override failed:', e);
       setSaveMsg((prev) => ({ ...prev, [k]: 'Ошибка' }));
