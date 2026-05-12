@@ -99,6 +99,7 @@ export async function sendTelegramReport({ studentName, subject, level, format =
     headers: { 'Content-Type': 'application/json', ...adminHeaders() },
     body: JSON.stringify({ studentName, subject, level, format }),
   });
-  if (!res.ok) throw new Error(`Marathon API /api/telegram/send-report → ${res.status}`);
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok && !data.sent && !data.errors) throw new Error(data.error || `Marathon API /api/telegram/send-report → ${res.status}`);
+  return data;
 }
