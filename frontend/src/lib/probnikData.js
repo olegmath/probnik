@@ -287,6 +287,27 @@ export async function loadSheetsData() {
         });
       }
     }
+    // Дедупликация: если ученик попал и в ЕГЭ и в ОГЭ листы по одному предмету —
+    // убираем ОГЭ-дубль (приоритет у ЕГЭ-записи с реальными баллами).
+    const nameToKeys = {};
+    for (const key of Object.keys(allStudents)) {
+      const n = allStudents[key].searchName;
+      if (!nameToKeys[n]) nameToKeys[n] = [];
+      nameToKeys[n].push(key);
+    }
+    for (const keys of Object.values(nameToKeys)) {
+      const egeKey = keys.find((k) => k.endsWith('|ЕГЭ'));
+      const ogeKey = keys.find((k) => k.endsWith('|ОГЭ'));
+      if (!egeKey || !ogeKey) continue;
+      const egeSubjects = allStudents[egeKey].subjects;
+      const ogeSubjects = allStudents[ogeKey].subjects;
+      for (const ogeSubjName of Object.keys(ogeSubjects)) {
+        const egeEquivalent = ogeSubjName.replace(' ОГЭ', ' ЕГЭ');
+        if (egeSubjects[egeEquivalent]) delete ogeSubjects[ogeSubjName];
+      }
+      if (Object.keys(ogeSubjects).length === 0) delete allStudents[ogeKey];
+    }
+
     return processStudentData(allStudents);
   } catch {
     return {};
