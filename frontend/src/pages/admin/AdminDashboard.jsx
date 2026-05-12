@@ -67,7 +67,8 @@ export default function AdminDashboard() {
   const reloadRatings = useCallback(() => {
     return getRatings({ isPublic: false, periodFrom, periodTo })
       .then((res) => {
-        setRawRows(res?.rows || []);
+        const rows = res?.rows || [];
+        if (rows.length) setRawRows(rows); // don't blank the table on a warming snapshot
         if (res?.period) setPeriod(res.period);
       })
       .catch(() => {});

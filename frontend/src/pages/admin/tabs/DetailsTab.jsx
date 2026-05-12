@@ -60,8 +60,8 @@ export default function DetailsTab({ rows, period, onSaved }) {
       setSaveMsg((prev) => ({ ...prev, [k]: 'Сохранено' }));
       cancelEdit(r);
       setTimeout(() => setSaveMsg((prev) => { const n = { ...prev }; delete n[k]; return n; }), 2000);
-      // Backend rebuilds the ratings snapshot in the background; give it a moment, then refetch.
-      if (onSaved) setTimeout(() => { onSaved(); }, 2500);
+      // Backend rebuilds the ratings snapshot in the background; refetch after a couple of beats.
+      if (onSaved) { setTimeout(() => { onSaved(); }, 3000); setTimeout(() => { onSaved(); }, 8000); }
     } catch (e) {
       console.error('penalty-override failed:', e);
       setSaveMsg((prev) => ({ ...prev, [k]: 'Ошибка' }));
