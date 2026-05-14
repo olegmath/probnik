@@ -314,12 +314,26 @@ export async function loadSheetsData() {
   }
 }
 
+function deduplicateAttempts(attempts) {
+  const sorted = [...attempts].sort((a, b) => {
+    if (Number.isFinite(a.sheetIndex) && Number.isFinite(b.sheetIndex)) return a.sheetIndex - b.sheetIndex;
+    return getDateSortValue(a.date) - getDateSortValue(b.date);
+  });
+  const seen = new Set();
+  return sorted.filter((a) => {
+    const fp = (a.taskScores || []).join(',');
+    if (seen.has(fp)) return false;
+    seen.add(fp);
+    return true;
+  });
+}
+
 function processStudentData(allStudents) {
   const result = {};
   for (const [key, student] of Object.entries(allStudents)) {
     const subjects = [];
     for (const subjectData of Object.values(student.subjects)) {
-      const attempts = sortAttemptsByDate(subjectData.attempts || []);
+      const attempts = sortAttemptsByDate(deduplicateAttempts(subjectData.attempts || []));
       const latest = attempts[0];
       if (!latest) continue;
       subjects.push({
