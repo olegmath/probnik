@@ -72,9 +72,9 @@ export default function ProbnikDetail() {
     const rowsCount = Math.max(0, endIdx - startIdx);
     const useFlowColumns = flowColumns && rowsCount > 17;
     return (
-      <div className="part-box" style={{ minWidth: 0, border: '2px solid var(--border)', borderRadius: 12, padding: 12, overflow: 'hidden', minHeight: 0, height: flowColumns ? '100%' : 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div className="part-box" style={{ minWidth: 0, border: '2px solid var(--border)', borderRadius: 12, padding: 12, overflow: 'hidden', minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--black)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 7 }}>{title}</div>
-        <div className="task-columns" style={{ flex: 1, minHeight: 0, columnCount: useFlowColumns ? 2 : 1, columnGap: 14, columnFill: 'auto', overflow: 'hidden' }}>
+        <div className="task-columns" style={{ flex: 1, minHeight: 0, columnCount: useFlowColumns ? 2 : 1, columnGap: 14, columnFill: 'auto', overflow: flowColumns ? 'hidden' : 'auto' }}>
           {renderTaskRows(startIdx, endIdx)}
         </div>
       </div>
@@ -163,7 +163,7 @@ export default function ProbnikDetail() {
               : renderPart('Задания', 0, totalTasks, true)}
 
             {hasPartSplit ? (
-              <div className="part-stack" style={{ minWidth: 0, minHeight: 0, display: 'grid', gridTemplateRows: 'auto minmax(0, 1fr)', gap: 12 }}>
+              <div className="part-stack" style={{ minWidth: 0, minHeight: 0, display: 'grid', gridTemplateRows: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12 }}>
                 {renderPart('Часть 2', partOneEnd, totalTasks)}
                 <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                   <ThemeAnalysis subject={cur} />
