@@ -520,7 +520,7 @@ export default function SchoolYear() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 24 }}>
             <PillBtn
               active={subjectIdx === -1}
-              onClick={() => { setSubjectIdx(-1); setTab('overview'); }}
+              onClick={() => setSubjectIdx(-1)}
             >
               Все предметы
             </PillBtn>
@@ -528,7 +528,7 @@ export default function SchoolYear() {
               <PillBtn
                 key={s.subject + s.group}
                 active={i === subjectIdx}
-                onClick={() => { setSubjectIdx(i); setTab('overview'); }}
+                onClick={() => setSubjectIdx(i)}
               >
                 {capitalize(s.subject) || s.group}
               </PillBtn>
