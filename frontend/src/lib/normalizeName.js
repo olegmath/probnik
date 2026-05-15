@@ -119,7 +119,10 @@ export function getStudentSearchNames(value) {
   const normalized = normalizePersonName(value);
   const parts = normalized.split(' ').filter(Boolean);
   if (parts.length !== 2) return [normalized];
-  return getFirstNameVariants(parts[1]).map((fn) => `${parts[0]} ${fn}`);
+  // Поддержка обоих порядков: "Фамилия Имя" и "Имя Фамилия"
+  const direct = getFirstNameVariants(parts[1]).map((fn) => `${parts[0]} ${fn}`);
+  const reversed = getFirstNameVariants(parts[0]).map((fn) => `${parts[1]} ${fn}`);
+  return Array.from(new Set([...direct, ...reversed]));
 }
 
 export function validateSearchName(value) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation, Link } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { useProbnik } from '../lib/ProbnikProvider.jsx';
 import { safeDecode } from '../lib/safeDecode';
 import { getStudentJournal } from '../lib/marathonApi.js';
@@ -98,21 +98,21 @@ function OverviewTab({ data }) {
 
       <div className="year-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
         <SummaryCard
-          label="Интеграл"
-          value={fmtNum(integral, 1)}
-          note="средняя по 3 метрикам"
-          color={pctColor(integral)}
-        />
-        <SummaryCard
           label="Посещаемость"
           value={fmtPct(attendance.pct, 0)}
           note={`был ${attendance.was} / ${attendance.total}`}
           color={pctColor(attendance.pct)}
         />
         <SummaryCard
+          label="Сдано ДЗ"
+          value={`${homework.count ?? '—'} / ${homework.total ?? '?'}`}
+          note="с оценкой из всех"
+          color={homework.count != null && homework.total ? pctColor(homework.count / homework.total * 100) : 'var(--black)'}
+        />
+        <SummaryCard
           label="Среднее ДЗ"
           value={fmtPct(homework.avg, 0)}
-          note={`${homework.count} оценок`}
+          note="средний балл"
           color={pctColor(homework.avg)}
         />
         <SummaryCard
@@ -135,25 +135,23 @@ function OverviewTab({ data }) {
       </div>
 
       <div className="gt-table-scroll" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-        <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+        <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
           <Th>Месяц</Th>
-          <Th>Был / Не был</Th>
+          <Th>Был / Пропустил</Th>
           <Th>Посещ.</Th>
-          <Th>Болел</Th>
         </div>
         {(attendance.by_month || []).map((m, i) => (
           <div key={m.monthKey} className="gt-table-row" style={{
-            display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr',
+            display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr',
             borderTop: i === 0 ? 'none' : '1px solid var(--border)',
             background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
           }}>
             <Td><span style={{ fontWeight: 800 }}>{m.month}</span></Td>
             <Td>
               <span style={{ fontWeight: 800 }}>{m.was}</span>
-              <span style={{ color: 'var(--gray)', fontWeight: 600 }}> / {m.absent}</span>
+              <span style={{ color: 'var(--gray)', fontWeight: 600 }}> / {m.absent + m.sick}</span>
             </Td>
             <Td><span style={{ fontWeight: 800, color: pctColor(m.pct) }}>{Math.round(m.pct)}%</span></Td>
-            <Td><span style={{ color: m.sick > 0 ? 'var(--black)' : 'var(--gray)', fontWeight: 700 }}>{m.sick}</span></Td>
           </div>
         ))}
       </div>
@@ -170,14 +168,24 @@ function HomeworkTab({ data }) {
   const trend = homework.trend || [];
   const points = trend.map((h) => h.grade);
   const labels = trend.map((h) => h.no != null ? `№${h.no}` : '?');
+  const kindPct = homework.kind_pct || {};
+  const kindKeys = Object.keys(kindPct);
 
   return (
     <div>
-      <div className="gt-summary-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-        <SummaryCard label="Среднее" value={fmtPct(homework.avg, 0)} note={`${homework.count} оценок`} color={pctColor(homework.avg)} />
-        <SummaryCard label="Принято" value={fmtPct(homework.done_pct, 0)} note="заданий из всех" />
-        <SummaryCard label="Не открыто" value={fmtPct(homework.not_opened_pct, 0)} note="заданий" color={homework.not_opened_pct >= 30 ? '#dc2626' : 'var(--black)'} />
+      <div className="gt-summary-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+        <SummaryCard label="Выполнено" value={fmtPct(homework.done_pct, 0)} note="заданий принято" color={pctColor(homework.done_pct)} />
+        <SummaryCard label="Принято" value={homework.done_count ?? '—'} note="задач со статусом Принято" />
+        <SummaryCard label="Не открыто" value={fmtPct(homework.not_opened_pct, 0)} note="задачи не открыты" color={homework.not_opened_pct >= 30 ? '#dc2626' : 'var(--black)'} />
+        <SummaryCard label="Качество" value={fmtPct(homework.avg, 0)} note="средний балл сданных ДЗ" color={pctColor(homework.avg)} />
       </div>
+      {kindKeys.length >= 2 && (
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${kindKeys.length}, 1fr)`, gap: 12, marginBottom: 16 }}>
+          {kindKeys.map((k) => (
+            <SummaryCard key={k} label={capitalize(k)} value={fmtPct(kindPct[k], 0)} note="принято из всех" color={pctColor(kindPct[k])} />
+          ))}
+        </div>
+      )}
 
       <div style={{ border: '2px solid var(--border)', borderRadius: 16, padding: 16, background: 'white', marginBottom: 16 }}>
         <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', marginBottom: 8 }}>Тренд по номеру ДЗ</div>
@@ -199,12 +207,17 @@ function HomeworkTab({ data }) {
             <div key={i} className="gt-table-row" style={{
               display: 'grid', gridTemplateColumns: '60px 2fr 1fr 1fr 1fr',
               borderTop: i === 0 ? 'none' : '1px solid var(--border)',
-              background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
+              background: h.not_done ? '#fef2f2' : (i % 2 === 0 ? 'var(--white)' : '#fafafa'),
             }}>
-              <Td><span style={{ fontWeight: 800 }}>{h.no ?? '—'}</span></Td>
-              <Td><span style={{ fontSize: 13 }}>{h.lesson}</span></Td>
-              <Td><span style={{ fontWeight: 800, color: pctColor(h.grade) }}>{h.grade.toFixed(0)}%</span></Td>
-              <Td><span style={{ fontFamily: 'monospace', color: 'var(--gray)' }}>{h.raw}/{h.max}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: h.not_done ? '#dc2626' : 'inherit' }}>{h.no ?? '—'}</span></Td>
+              <Td><span style={{ fontSize: 13, color: h.not_done ? '#dc2626' : 'inherit' }}>{h.lesson}</span></Td>
+              <Td>
+                {h.not_done
+                  ? <span style={{ fontWeight: 700, color: '#dc2626' }}>Не сдано</span>
+                  : <span style={{ fontWeight: 800, color: pctColor(h.grade) }}>{h.grade.toFixed(0)}%</span>
+                }
+              </Td>
+              <Td><span style={{ fontFamily: 'monospace', color: 'var(--gray)' }}>{h.not_done ? '—' : `${h.raw}/${h.max}`}</span></Td>
               <Td><span style={{ fontSize: 12, color: 'var(--gray)' }}>{formatDate(h.date)}</span></Td>
             </div>
           ))}
@@ -268,10 +281,9 @@ function AttendanceTab({ data }) {
 
   return (
     <div>
-      <div className="gt-summary-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div className="gt-summary-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
         <SummaryCard label="Был" value={attendance.was} color="#16a34a" note={`из ${attendance.total} занятий`} />
-        <SummaryCard label="Не был" value={attendance.absent} color={attendance.absent > 5 ? '#dc2626' : 'var(--black)'} />
-        <SummaryCard label="Болел" value={attendance.sick} color="var(--black)" />
+        <SummaryCard label="Пропустил" value={attendance.absent + attendance.sick} color={(attendance.absent + attendance.sick) > 5 ? '#dc2626' : 'var(--black)'} note="вкл. болезни" />
         <SummaryCard label="Подряд пропусков" value={attendance.max_streak} color={attendance.max_streak >= 3 ? '#dc2626' : 'var(--black)'} note="максимум" />
       </div>
 
@@ -284,23 +296,21 @@ function AttendanceTab({ data }) {
         <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет данных о посещениях</div>
       ) : (
         <div className="gt-table-scroll" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-          <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+          <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
             <Th>Месяц</Th>
             <Th>Был</Th>
-            <Th>Не был</Th>
-            <Th>Болел</Th>
+            <Th>Пропустил</Th>
             <Th>Посещ.</Th>
           </div>
           {months.map((m, i) => (
             <div key={m.monthKey} className="gt-table-row" style={{
-              display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr',
+              display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr',
               borderTop: i === 0 ? 'none' : '1px solid var(--border)',
               background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
             }}>
               <Td><span style={{ fontWeight: 800 }}>{m.month}</span></Td>
               <Td><span style={{ fontWeight: 800, color: '#16a34a' }}>{m.was}</span></Td>
-              <Td><span style={{ fontWeight: 800, color: m.absent > 0 ? '#dc2626' : 'var(--gray)' }}>{m.absent}</span></Td>
-              <Td><span style={{ color: 'var(--gray)', fontWeight: 700 }}>{m.sick}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: (m.absent + m.sick) > 0 ? '#dc2626' : 'var(--gray)' }}>{m.absent + m.sick}</span></Td>
               <Td><span style={{ fontWeight: 800, color: pctColor(m.pct) }}>{Math.round(m.pct)}%</span></Td>
             </div>
           ))}
@@ -350,6 +360,56 @@ function EmptyState() {
   );
 }
 
+function computeAggregate(subjects) {
+  if (!subjects || subjects.length === 0) return null;
+  if (subjects.length === 1) return subjects[0];
+
+  const totalHwCount = subjects.reduce((s, sub) => s + (sub.homework?.count || 0), 0);
+  const totalHwEvents = subjects.reduce((s, sub) => s + (sub.homework?.total || 0), 0);
+  const hwAvg = totalHwCount > 0
+    ? subjects.reduce((s, sub) => s + (sub.homework?.avg || 0) * (sub.homework?.count || 0), 0) / totalHwCount
+    : null;
+  const hwDonePct = subjects.some((s) => s.homework?.done_pct != null)
+    ? subjects.reduce((s, sub) => s + (sub.homework?.done_pct || 0), 0) / subjects.length
+    : null;
+  const hwNotOpenedPct = subjects.some((s) => s.homework?.not_opened_pct != null)
+    ? subjects.reduce((s, sub) => s + (sub.homework?.not_opened_pct || 0), 0) / subjects.length
+    : null;
+  const hwDoneCount = subjects.reduce((s, sub) => s + (sub.homework?.done_count || 0), 0);
+  const hwTrend = subjects.flatMap((sub) => sub.homework?.trend || [])
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  const attWas = subjects.reduce((s, sub) => s + (sub.attendance?.was || 0), 0);
+  const attAbsent = subjects.reduce((s, sub) => s + (sub.attendance?.absent || 0), 0);
+  const attSick = subjects.reduce((s, sub) => s + (sub.attendance?.sick || 0), 0);
+  const attTotal = subjects.reduce((s, sub) => s + (sub.attendance?.total || 0), 0);
+  const attPct = attTotal > 0 ? attWas / attTotal * 100 : null;
+  const attMaxStreak = Math.max(...subjects.map((s) => s.attendance?.max_streak || 0));
+  const attByMonth = subjects[0]?.attendance?.by_month || [];
+
+  const krCount = subjects.reduce((s, sub) => s + (sub.kr?.count || 0), 0);
+  const krAvg = krCount > 0
+    ? subjects.reduce((s, sub) => s + (sub.kr?.avg || 0) * (sub.kr?.count || 0), 0) / krCount
+    : null;
+  const krList = subjects.flatMap((sub) => sub.kr?.list || [])
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+  const flags = [...new Set(subjects.flatMap((s) => s.flags || []))];
+  const ranks = subjects[0]?.ranks;
+
+  return {
+    subject: 'Все предметы',
+    group: subjects.map((s) => s.group).filter(Boolean).join(', '),
+    teacher: null,
+    attendance: { pct: attPct != null ? Math.round(attPct * 10) / 10 : null, was: attWas, absent: attAbsent, sick: attSick, total: attTotal, max_streak: attMaxStreak, by_month: attByMonth },
+    homework: { avg: hwAvg != null ? Math.round(hwAvg * 10) / 10 : null, count: totalHwCount, total: totalHwEvents, done_count: hwDoneCount, done_pct: hwDonePct != null ? Math.round(hwDonePct * 10) / 10 : null, not_opened_pct: hwNotOpenedPct != null ? Math.round(hwNotOpenedPct * 10) / 10 : null, sub_status: {}, trend: hwTrend },
+    kr: { avg: krAvg != null ? Math.round(krAvg * 10) / 10 : null, count: krCount, list: krList },
+    integral: null,
+    flags,
+    ranks,
+  };
+}
+
 function PillBtn({ active, onClick, children }) {
   return (
     <button
@@ -375,9 +435,10 @@ function PillBtn({ active, onClick, children }) {
 export default function SchoolYear() {
   const { id } = useParams();
   const { state } = useLocation();
+  const navigate = useNavigate();
   const { allStudents } = useProbnik();
   const [tab, setTab] = useState('overview');
-  const [subjectIdx, setSubjectIdx] = useState(0);
+  const [subjectIdx, setSubjectIdx] = useState(-1);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -389,7 +450,7 @@ export default function SchoolYear() {
     setLoading(true);
     setError(null);
     setData(null);
-    setSubjectIdx(0);
+    setSubjectIdx(-1);
     getStudentJournal(student.name)
       .then((res) => {
         if (res.ok) {
@@ -414,7 +475,9 @@ export default function SchoolYear() {
   }
 
   const subjects = data?.subjects || [];
-  const activeSubject = subjects[subjectIdx] || null;
+  const activeSubject = subjectIdx === -1
+    ? computeAggregate(subjects)
+    : (subjects[subjectIdx] || null);
 
   const renderContent = () => {
     if (loading) return <LoadingState />;
@@ -430,6 +493,17 @@ export default function SchoolYear() {
   return (
     <section className="year-section" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 60px' }}>
       <div className="fade-up">
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'none', border: '2px solid var(--border)', borderRadius: 100,
+            padding: '8px 16px', cursor: 'pointer', fontFamily: 'Inter',
+            fontSize: 13, fontWeight: 700, color: 'var(--black)', marginBottom: 20,
+          }}
+        >
+          ← Назад
+        </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <Chip>{student.examType} 2026</Chip>
           <Chip filled={false} small>Учебный год 2025/26</Chip>
@@ -444,6 +518,12 @@ export default function SchoolYear() {
         {/* Subject selector — shown only when multiple subjects */}
         {subjects.length > 1 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 24 }}>
+            <PillBtn
+              active={subjectIdx === -1}
+              onClick={() => { setSubjectIdx(-1); setTab('overview'); }}
+            >
+              Все предметы
+            </PillBtn>
             {subjects.map((s, i) => (
               <PillBtn
                 key={s.subject + s.group}

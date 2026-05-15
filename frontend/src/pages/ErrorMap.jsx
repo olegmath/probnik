@@ -263,7 +263,7 @@ function DayCard({ day, examWord }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'Inter' }}>
               <thead>
                 <tr style={{ background: '#f8f8f8' }}>
-                  {['Задание', 'Тема', 'История', 'Ошибок', 'Статус'].map((h) => (
+                  {['Задание', 'Тема', 'История', 'Ошибок', '%', 'Статус'].map((h) => (
                     <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 900, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--black)', borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -275,6 +275,13 @@ function DayCard({ day, examWord }) {
                     <td style={{ padding: '9px 10px', color: 'var(--gray)', fontWeight: 600, maxWidth: 220 }}>{getTopicNote(q) || '—'}</td>
                     <td style={{ padding: '9px 10px' }}><AttemptDots attempts={q.attempts || []} /></td>
                     <td style={{ padding: '9px 10px', fontWeight: 900, textAlign: 'center' }}>{Number(q.wrongAttempts || 0)}</td>
+                    {(() => {
+                      const total = (q.attempts || []).length;
+                      const correct = (q.attempts || []).filter(a => a.isCorrect).length;
+                      const pct = total > 0 ? Math.round(correct / total * 100) : null;
+                      const color = pct === null ? 'var(--gray)' : pct >= 80 ? '#34b87a' : pct >= 50 ? '#f5a623' : '#e05454';
+                      return <td style={{ padding: '9px 10px', fontWeight: 900, textAlign: 'center', color }}>{pct === null ? '—' : `${pct}%`}</td>;
+                    })()}
                     <td style={{ padding: '9px 10px' }}><StatusBadge status={q.status || 'empty'} /></td>
                   </tr>
                 ))}
@@ -370,7 +377,7 @@ export default function ErrorMap() {
           <svg width="40" height="40" viewBox="0 0 48 48" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px', display: 'block' }}>
             <circle cx="24" cy="24" r="20" stroke="var(--blue)" strokeWidth="4" fill="none" strokeDasharray="31.4 62.8" />
           </svg>
-          <p style={{ fontWeight: 700, color: 'var(--gray)' }}>Загрузка карты ошибок...</p>
+          <p style={{ fontWeight: 700, color: 'var(--gray)' }}>Загрузка займёт несколько минут...</p>
         </div>
       )}
 

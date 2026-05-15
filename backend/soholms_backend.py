@@ -86,6 +86,52 @@ ADMIN_RATINGS_SNAPSHOT_PATH = os.getenv(
     os.path.join(os.path.dirname(__file__), "admin_ratings_snapshot.json"),
 )
 ADMIN_RATINGS_REFRESH_SECONDS = int(os.getenv("ADMIN_RATINGS_REFRESH_SECONDS", str(60 * 60)))
+JOURNAL_SNAPSHOT_PATH = os.getenv(
+    "JOURNAL_SNAPSHOT_PATH",
+    os.path.join(os.path.dirname(__file__), "journal_snapshot.json"),
+)
+JOURNAL_REFRESH_SECONDS = int(os.getenv("JOURNAL_REFRESH_SECONDS", str(60 * 60)))
+JOURNAL_GROUP_NAMES: frozenset[str] = frozenset({
+    # 9 класс — Информатика
+    "инф9ВТ1730БП", "инф9ПН1730Л", "инф9СР1900Л",
+    # 9 класс — Математика
+    "мат9ВТПТ1600ЛДима", "мат9ВТПТ1600ЛКатя", "мат9допоготовкаКатя",
+    "мат9ПНЧТ1600БПКатя", "мат9ПНЧТ1600Л", "мат9ПНЧТ1730БП",
+    "мат9ПНЧТ1730Л0.5", "мат9СР1900мини",
+    # 9 класс — Обществознание
+    "общ9СРСБ1730Л",
+    # 9 класс — Русский язык
+    "рус9ВТПТ1730Л", "рус9ПНЧТ1600БП", "рус9ПНЧТ1600Л0.5", "рус9СРСБ1600Л",
+    # 9 класс — Физика
+    "физ9ВТПТ1730Л", "физ9ПНЧТ1600Л0.5", "физ9СР1900лабы",
+    # 10 класс — Информатика
+    "инф10ЧТ1730Л",
+    # 10 класс — Математика
+    "мат10ВТ1600БП", "мат10СБ1600Л", "мат10СР1600Лег", "мат10СР1600Лима", "мат10СР1730Лима",
+    # 10 класс — Обществознание
+    "общ10ВТ1730БП", "общ10ПН1600Л",
+    # 10 класс — Русский язык
+    "рус10СБ1600Л",
+    # 10 класс — Физика
+    "физ10СБ1730Леша", "физ10СБ1730Лима",
+    # 11 класс — Информатика
+    "инф11ВТПТ1600БП", "инф11ВТПТ1600Л", "инф11ВТПТ1730Л",
+    "инф11ЛМиник", "инф11ПНЧТ1900Л", "инф11СРСБ2030нлайн",
+    # 11 класс — История
+    "ист11ПНЧТ1730Л",
+    # 11 класс — Математика
+    "мат11ВТПТ1600Л", "мат11ВТПТ1730БП", "мат11ВТПТ1730Л", "мат11ВТПТ1900Лег",
+    "мат11ПНЧТ1600БП", "мат11ПНЧТ1730Л", "мат11ПНЧТ1800нлайн0.5", "мат11ПНЧТ1900Лима",
+    "мат11СБ1900БАЗА", "матСБ1730Лицей", "матСР1730Лминипараметр",
+    "матСР1730миничисла", "матСР1730Лминипланик", "матСР1730стерик",
+    # 11 класс — Обществознание
+    "общ11ВТПТ1600БП", "общ11ПНЧТ1900Л",
+    # 11 класс — Русский язык
+    "рус11ВТ2030минисочин", "рус11ВТПТ1600ЛРус", "рус11ВТПТ1730Л",
+    "рус11ПНЧТ1730БП", "рус11ПНЧТ1730Л", "рус11ПНЧТ1900Л", "рус11СРСБ1800нлайн0.5",
+    # 11 класс — Физика
+    "физ11ВТПТ1900Л", "физ11СР1730Лиц", "физ11СРСБ1600Л",
+})
 PENALTY_OVERRIDES_PATH = os.getenv(
     "PENALTY_OVERRIDES_PATH",
     os.path.join(os.path.dirname(__file__), "penalty_overrides.json"),
@@ -255,6 +301,9 @@ _ADMIN_RATINGS_SNAPSHOT_LOCK = threading.Lock()
 _ADMIN_RATINGS_REFRESH_LOCK = threading.Lock()
 _ADMIN_RATINGS_REFRESHING_LOCK = threading.Lock()
 _ADMIN_RATINGS_REFRESHING_KEYS: set[str] = set()
+_JOURNAL_SNAPSHOT_LOCK = threading.Lock()
+_JOURNAL_REFRESHING_LOCK = threading.Lock()
+_JOURNAL_REFRESHING: bool = False
 
 
 class BackendError(Exception):
@@ -2439,7 +2488,7 @@ def parse_attendance_xlsx(
                 "baseScore": base_score,
                 "penalty": penalty,
                 "finalScore": final_score,
-                "score": final_score,
+                "score": base_score,
             }
         )
         rows.append(item)
@@ -2773,35 +2822,65 @@ def parse_journal_full(content: bytes) -> list[dict[str, Any]]:
     return events
 
 
+def _fetch_journal_events_fresh(period_from: str, period_to: str) -> list[dict[str, Any]]:
+    """Полная загрузка журнала по всем группам (без кеша) + сохранение на диск."""
+    groups = [g for g in selected_groups() if g.name in JOURNAL_GROUP_NAMES]
+    all_events: list[dict[str, Any]] = []
+
+    def fetch_group(group: GroupInfo) -> list[dict[str, Any]]:
+        content = fetch_attendance_xlsx(group.id, period_from, period_to)
+        evs = parse_journal_full(content)
+        level = infer_level(group.name) or ""
+        for e in evs:
+            e["_subject"] = group.subject
+            e["_teacher"] = group.teacher
+            e["_level"] = level
+            e["_group_id"] = group.id
+        return evs
+
+    with ThreadPoolExecutor(max_workers=max(1, DEFAULT_CONCURRENCY)) as executor:
+        futures = {executor.submit(fetch_group, group): group for group in groups}
+        for future in as_completed(futures):
+            try:
+                all_events.extend(future.result())
+            except Exception:
+                pass
+
+    try:
+        write_journal_snapshot_file({
+            "version": 1,
+            "periodFrom": period_from,
+            "periodTo": period_to,
+            "savedAt": utc_timestamp(),
+            "savedAtEpoch": time.time(),
+            "events": all_events,
+        })
+    except Exception as err:
+        sys.stderr.write(f"Failed to write journal snapshot: {err}\n")
+
+    return all_events
+
+
 def fetch_journal_events(period_from: str, period_to: str) -> list[dict[str, Any]]:
-    """Параллельная загрузка журнала по всем группам. Кеш 1 час."""
+    """Загрузка журнала: in-memory → диск → сеть."""
     cache_key = f"journal_events:{period_from}:{period_to}"
 
     def load() -> list[dict[str, Any]]:
-        groups = selected_groups()
-        all_events: list[dict[str, Any]] = []
+        snap = read_journal_snapshot_file()
+        if (
+            snap
+            and snap.get("periodFrom") == period_from
+            and snap.get("periodTo") == period_to
+            and isinstance(snap.get("events"), list)
+        ):
+            saved_at_epoch = float(snap.get("savedAtEpoch") or 0)
+            age = time.time() - saved_at_epoch if saved_at_epoch else float("inf")
+            if age >= JOURNAL_REFRESH_SECONDS:
+                start_journal_snapshot_refresh(period_from, period_to)
+            return snap["events"]
+        return _fetch_journal_events_fresh(period_from, period_to)
 
-        def fetch_group(group: GroupInfo) -> list[dict[str, Any]]:
-            content = fetch_attendance_xlsx(group.id, period_from, period_to)
-            evs = parse_journal_full(content)
-            level = infer_level(group.name) or ""
-            for e in evs:
-                e["_subject"] = group.subject
-                e["_teacher"] = group.teacher
-                e["_level"] = level
-                e["_group_id"] = group.id
-            return evs
-
-        with ThreadPoolExecutor(max_workers=max(1, DEFAULT_CONCURRENCY)) as executor:
-            futures = {executor.submit(fetch_group, group): group for group in groups}
-            for future in as_completed(futures):
-                try:
-                    all_events.extend(future.result())
-                except Exception:
-                    pass
-        return all_events
-
-    return cached(cache_key, 3600, load)
+    return cached(cache_key, JOURNAL_REFRESH_SECONDS, load)
 
 
 def _journal_max_per_lesson(events: list[dict[str, Any]]) -> tuple[dict, dict]:
@@ -2833,10 +2912,9 @@ def _journal_aggregate_one(
     kr_max: dict[tuple[str, str], float],
 ) -> dict[str, Any]:
     """Считает посещаемость / ДЗ / КР / интеграл / флаги для одного ученика."""
-    # Attendance — события типа "Математика"
-    att_events = [e for e in student_events if e["type"] == "Математика"]
+    # Attendance — любые строки со статусом посещения, независимо от типа урока
     att_sorted = sorted(
-        [e for e in att_events if e["status"] in ("Был", "Не был", "Болел")],
+        [e for e in student_events if e["status"] in ("Был", "Не был", "Болел")],
         key=lambda x: x.get("date") or "",
     )
     counts = {"Был": 0, "Не был": 0, "Болел": 0}
@@ -2885,6 +2963,7 @@ def _journal_aggregate_one(
     hw_norm: list[float] = []
     hw_trend: list[dict[str, Any]] = []
     sub_status_count: dict[str, int] = {}
+    kind_status_count: dict[str, dict[str, int]] = {}
     for e in hw_events:
         if isinstance(e.get("g_dz"), (int, float)):
             mx = hw_max.get((e["group"], e["lesson"]))
@@ -2898,11 +2977,28 @@ def _journal_aggregate_one(
                     "raw": float(e["g_dz"]),
                     "max": mx,
                     "date": e.get("date") or "",
+                    "not_done": False,
                 })
+        else:
+            hw_trend.append({
+                "no": _journal_extract_no(e["lesson"], "Домашка"),
+                "lesson": e["lesson"],
+                "grade": 0,
+                "raw": 0,
+                "max": hw_max.get((e["group"], e["lesson"])),
+                "date": e.get("date") or "",
+                "not_done": True,
+            })
         for sr in e["sub_rows"]:
             st = sr.get("status") or ""
             if st:
                 sub_status_count[st] = sub_status_count.get(st, 0) + 1
+            kind = (sr.get("task_kind") or "").lower()
+            if kind:
+                kind_status_count.setdefault(kind, {"done": 0, "total": 0})
+                kind_status_count[kind]["total"] += 1
+                if st == "Принято":
+                    kind_status_count[kind]["done"] += 1
     hw_total_subs = sum(sub_status_count.values())
     hw_done_pct = (
         round(sub_status_count.get("Принято", 0) / hw_total_subs * 100, 1)
@@ -2964,9 +3060,15 @@ def _journal_aggregate_one(
         "homework": {
             "avg": hw_avg,
             "count": len(hw_norm),
+            "total": len(hw_events),
+            "done_count": sub_status_count.get("Принято", 0),
             "done_pct": hw_done_pct,
             "not_opened_pct": hw_not_opened_pct,
             "sub_status": sub_status_count,
+            "kind_pct": {
+                k: round(v["done"] / v["total"] * 100, 1) if v["total"] else None
+                for k, v in kind_status_count.items()
+            },
             "trend": hw_trend,
         },
         "kr": {
@@ -3001,7 +3103,7 @@ def _journal_group_by_student(events: list[dict[str, Any]]) -> dict[tuple[str, s
 
 
 def aggregate_student_journal(
-    events: list[dict[str, Any]], student_name: str, subject: str = ""
+    events: list[dict[str, Any]], student_name: str
 ) -> dict[str, Any] | None:
     name_key = normalize_person_key(student_name)
     if not name_key:
@@ -3010,50 +3112,53 @@ def aggregate_student_journal(
     matching_keys = [k for k in by_student if k[0].startswith(name_key)]
     if not matching_keys:
         return None
-    # If subject specified — prefer entries matching that subject
-    if subject:
-        subj_norm = subject.strip().lower()
-        subj_filtered = [k for k in matching_keys if by_student[k].get("subject", "").lower() == subj_norm]
-        if subj_filtered:
-            matching_keys = subj_filtered
-    # Among remaining, pick entry with most events (most complete journal data)
-    target_key = max(matching_keys, key=lambda k: len(by_student[k]["events"]))
 
     hw_max, kr_max = _journal_max_per_lesson(events)
-    target = by_student[target_key]
-    detail = _journal_aggregate_one(target["events"], hw_max, kr_max)
-    detail["name"] = target["name"]
-    detail["group"] = target["group"]
-    detail["subject"] = target["subject"]
-    detail["teacher"] = target["teacher"]
 
-    integrals = []
+    # Compute all integrals for ranking; key = (name_key, group)
+    group_integrals: dict[tuple[str, str], list[dict]] = {}
+    subject_integrals: dict[str, list[dict]] = {}
     for key, data in by_student.items():
         agg = _journal_aggregate_one(data["events"], hw_max, kr_max)
-        if agg["integral"] is not None:
-            integrals.append({
-                "name_key": key[0],
-                "group": data["group"],
-                "integral": agg["integral"],
-            })
+        if agg["integral"] is None:
+            continue
+        entry = {"nk": key[0], "gk": key[1], "integral": agg["integral"]}
+        grp = data.get("group", "")
+        subj = data.get("subject", "")
+        group_integrals.setdefault(grp, []).append(entry)
+        subject_integrals.setdefault(subj, []).append(entry)
 
-    same_group = sorted(
-        [x for x in integrals if x["group"] == target["group"]],
-        key=lambda x: -x["integral"],
-    )
-    school = sorted(integrals, key=lambda x: -x["integral"])
+    def _ranked(lst: list[dict]) -> list[dict]:
+        return sorted(lst, key=lambda x: -x["integral"])
 
-    def _place(lst, key):
+    def _place(lst: list[dict], nk: str, gk: str) -> int | None:
         for i, x in enumerate(lst):
-            if x["name_key"] == key:
+            if x["nk"] == nk and x["gk"] == gk:
                 return i + 1
         return None
 
-    detail["ranks"] = {
-        "in_group": {"place": _place(same_group, target_key[0]), "of": len(same_group)},
-        "in_school": {"place": _place(school, target_key[0]), "of": len(school)},
-    }
-    return detail
+    subjects_out = []
+    actual_name = None
+    for target_key in sorted(matching_keys, key=lambda k: by_student[k].get("subject", "")):
+        target = by_student[target_key]
+        actual_name = actual_name or target["name"]
+        agg = _journal_aggregate_one(target["events"], hw_max, kr_max)
+        nk, gk = target_key
+        grp = target.get("group", "")
+        subj = target.get("subject", "")
+        in_group = _ranked(group_integrals.get(grp, []))
+        in_subj = _ranked(subject_integrals.get(subj, []))
+        agg["subject"] = subj
+        agg["group"] = grp
+        agg["teacher"] = target.get("teacher", "")
+        agg["level"] = target.get("level", "")
+        agg["ranks"] = {
+            "in_group": {"place": _place(in_group, nk, gk), "of": len(in_group)},
+            "in_school": {"place": _place(in_subj, nk, gk), "of": len(in_subj)},
+        }
+        subjects_out.append(agg)
+
+    return {"name": actual_name, "subjects": subjects_out}
 
 
 def aggregate_school_journal(events: list[dict[str, Any]], mode: str) -> dict[str, Any]:
@@ -3128,8 +3233,9 @@ def aggregate_school_journal(events: list[dict[str, Any]], mode: str) -> dict[st
         [s for s in students_agg if s["integral"] is not None],
         key=lambda x: -x["integral"],
     )
+    unique_students = {normalize_person_key(s["name"]) for s in students_agg}
     return {
-        "studentsCount": len(students_agg),
+        "studentsCount": len(unique_students),
         "groupsCount": len(groups_map),
         "attendancePct": _avg(all_att),
         "hwAvg": _avg(all_hw),
@@ -3274,7 +3380,6 @@ def apply_penalty_overrides(payload: dict[str, Any]) -> dict[str, Any]:
             row["penaltyOverridden"] = True
             final_score = max(0.0, float(row.get("baseScore") or 0) - penalty)
             row["finalScore"] = final_score
-            row["score"] = final_score
 
     add_places(rows)
     return payload
@@ -3549,6 +3654,29 @@ def write_admin_ratings_snapshot_file(snapshot: dict[str, Any]) -> None:
         os.replace(temp_path, ADMIN_RATINGS_SNAPSHOT_PATH)
 
 
+def read_journal_snapshot_file() -> dict[str, Any] | None:
+    if not os.path.exists(JOURNAL_SNAPSHOT_PATH):
+        return None
+    with _JOURNAL_SNAPSHOT_LOCK:
+        try:
+            with open(JOURNAL_SNAPSHOT_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+    return data if isinstance(data, dict) else None
+
+
+def write_journal_snapshot_file(data: dict[str, Any]) -> None:
+    directory = os.path.dirname(JOURNAL_SNAPSHOT_PATH)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    temp_path = f"{JOURNAL_SNAPSHOT_PATH}.tmp"
+    with _JOURNAL_SNAPSHOT_LOCK:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+        os.replace(temp_path, JOURNAL_SNAPSHOT_PATH)
+
+
 def add_admin_snapshot_meta(payload: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
     saved_at_epoch = float(snapshot.get("savedAtEpoch") or 0)
     return {
@@ -3697,6 +3825,63 @@ def start_admin_ratings_snapshot_scheduler() -> None:
         return
     thread = threading.Thread(target=admin_ratings_snapshot_scheduler, daemon=True)
     thread.start()
+
+
+def start_journal_snapshot_refresh(
+    period_from: str = "2025-09-01", period_to: str = "2026-05-31"
+) -> bool:
+    global _JOURNAL_REFRESHING
+    with _JOURNAL_REFRESHING_LOCK:
+        if _JOURNAL_REFRESHING:
+            return False
+        _JOURNAL_REFRESHING = True
+
+    def _refresh() -> None:
+        global _JOURNAL_REFRESHING
+        try:
+            events = _fetch_journal_events_fresh(period_from, period_to)
+            cache_key = f"journal_events:{period_from}:{period_to}"
+            _CACHE[cache_key] = (time.time(), events)
+            sys.stderr.write(f"Journal snapshot refreshed: {len(events)} events\n")
+        except Exception as err:
+            sys.stderr.write(f"Journal snapshot refresh failed: {err}\n")
+        finally:
+            with _JOURNAL_REFRESHING_LOCK:
+                _JOURNAL_REFRESHING = False
+
+    threading.Thread(target=_refresh, daemon=True).start()
+    return True
+
+
+def journal_snapshot_scheduler() -> None:
+    while True:
+        try:
+            snap = read_journal_snapshot_file()
+            saved_at_epoch = float(snap.get("savedAtEpoch") or 0) if snap else 0
+            age = time.time() - saved_at_epoch if saved_at_epoch else float("inf")
+            if age >= JOURNAL_REFRESH_SECONDS:
+                start_journal_snapshot_refresh()
+        except Exception as err:
+            sys.stderr.write(f"Journal snapshot scheduler error: {err}\n")
+        time.sleep(max(60, min(JOURNAL_REFRESH_SECONDS, 60 * 60)))
+
+
+def start_journal_snapshot_scheduler() -> None:
+    if JOURNAL_REFRESH_SECONDS <= 0:
+        return
+    snap = read_journal_snapshot_file()
+    if snap and isinstance(snap.get("events"), list):
+        pf = snap.get("periodFrom", "2025-09-01")
+        pt = snap.get("periodTo", "2026-05-31")
+        cache_key = f"journal_events:{pf}:{pt}"
+        _CACHE[cache_key] = (float(snap.get("savedAtEpoch") or time.time()), snap["events"])
+        sys.stderr.write(f"Journal snapshot loaded from disk: {len(snap['events'])} events\n")
+        saved_at_epoch = float(snap.get("savedAtEpoch") or 0)
+        if time.time() - saved_at_epoch >= JOURNAL_REFRESH_SECONDS:
+            start_journal_snapshot_refresh(pf, pt)
+    else:
+        start_journal_snapshot_refresh()
+    threading.Thread(target=journal_snapshot_scheduler, daemon=True).start()
 
 
 def format_report_number(value: Any, digits: int = 2) -> str:
@@ -4606,9 +4791,8 @@ class Handler(BaseHTTPRequestHandler):
                     raise BackendError("name is required", HTTPStatus.BAD_REQUEST)
                 period_from = query.get("from") or "2025-09-01"
                 period_to = query.get("to") or "2026-05-31"
-                subject_filter = normalize_text(query.get("subject", "")).lower()
                 events = fetch_journal_events(period_from, period_to)
-                result = aggregate_student_journal(events, student_name, subject_filter)
+                result = aggregate_student_journal(events, student_name)
                 if result is None:
                     return self.send_json({"ok": False, "error": "student not found"}, HTTPStatus.NOT_FOUND)
                 return self.send_json({
@@ -4617,6 +4801,21 @@ class Handler(BaseHTTPRequestHandler):
                     "period": {"from": period_from, "to": period_to},
                     **result,
                 }, cache_seconds=300)
+
+            if parsed.path == "/api/journal/refresh":
+                self.require_admin(query)
+                period_from = query.get("periodFrom") or query.get("from") or "2025-09-01"
+                period_to = query.get("periodTo") or query.get("to") or "2026-05-31"
+                started = start_journal_snapshot_refresh(period_from, period_to)
+                snap = read_journal_snapshot_file()
+                return self.send_json({
+                    "ok": True,
+                    "refreshStarted": started,
+                    "snapshot": {
+                        "savedAt": snap.get("savedAt") if snap else None,
+                        "events": len(snap.get("events", [])) if snap else 0,
+                    },
+                }, cache_seconds=0)
 
             if parsed.path == "/api/journal-summary":
                 self.require_admin(query)
@@ -4633,6 +4832,42 @@ class Handler(BaseHTTPRequestHandler):
                     "period": {"from": period_from, "to": period_to},
                     **result,
                 }, cache_seconds=300)
+
+            if parsed.path == "/api/debug/journal-events":
+                self.require_admin(query)
+                student_name = normalize_text(query.get("name", ""))
+                if not student_name:
+                    raise BackendError("name is required", HTTPStatus.BAD_REQUEST)
+                period_from = query.get("from") or "2025-09-01"
+                period_to = query.get("to") or "2026-05-31"
+                events = fetch_journal_events(period_from, period_to)
+                name_key = normalize_person_key(student_name)
+                by_student = _journal_group_by_student(events)
+                matching_keys = [k for k in by_student if k[0].startswith(name_key)]
+                if not matching_keys:
+                    return self.send_json({"ok": False, "error": "student not found"}, HTTPStatus.NOT_FOUND)
+                key = matching_keys[0]
+                student_evs = by_student[key]["events"]
+                type_counts: dict[str, int] = {}
+                status_counts: dict[str, int] = {}
+                for e in student_evs:
+                    t = e.get("type") or ""
+                    s = e.get("status") or ""
+                    type_counts[t] = type_counts.get(t, 0) + 1
+                    status_counts[s] = status_counts.get(s, 0) + 1
+                return self.send_json({
+                    "ok": True,
+                    "student": student_name,
+                    "matched_key": key[0],
+                    "group": key[1],
+                    "total_events": len(student_evs),
+                    "type_counts": type_counts,
+                    "status_counts": status_counts,
+                    "att_events": [
+                        {"type": e["type"], "status": e["status"], "lesson": e.get("lesson"), "date": e.get("date")}
+                        for e in student_evs if e["status"] in ("Был", "Не был", "Болел")
+                    ],
+                }, cache_seconds=0)
 
             self.send_json({"ok": False, "error": "Not found"}, HTTPStatus.NOT_FOUND)
         except BackendError as error:
@@ -4692,6 +4927,7 @@ def main():
     port = int(os.getenv("PORT", "8787"))
     start_public_ratings_snapshot_scheduler()
     start_admin_ratings_snapshot_scheduler()
+    start_journal_snapshot_scheduler()
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"Soholms backend listening on http://{host}:{port}", flush=True)
     server.serve_forever()
