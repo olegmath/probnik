@@ -14,12 +14,29 @@ export default function TeachersTab({ rows }) {
     const map = {};
     rows.forEach((r) => {
       const t = r.teacher || 'Без преподавателя';
-      if (!map[t]) map[t] = { teacher: t, students: 0, totalFinal: 0, groups: new Set() };
+      if (!map[t]) map[t] = { teacher: t, students: 0, totalFinal: 0, groups: new Map() };
+      const score = r.finalScore ?? r.final_score ?? 0;
       map[t].students++;
-      map[t].totalFinal += r.finalScore ?? r.final_score ?? 0;
-      if (r.group) map[t].groups.add(r.group);
+      map[t].totalFinal += score;
+      const g = r.group || '—';
+      const gr = map[t].groups.get(g) || { sum: 0, count: 0 };
+      map[t].groups.set(g, { sum: gr.sum + score, count: gr.count + 1 });
     });
-    return Object.values(map).map((t) => ({ ...t, groupCount: t.groups.size, avgScore: t.totalFinal / t.students }));
+    return Object.values(map).map((t) => {
+      // Среднее по ученикам — большая группа весит больше.
+      const avgByStudent = t.totalFinal / t.students;
+      // Среднее по группам — каждая группа весит одинаково независимо от размера.
+      const groupMeans = [...t.groups.values()].map((g) => g.sum / g.count);
+      const avgByGroup = groupMeans.reduce((a, b) => a + b, 0) / groupMeans.length;
+      // Итоговый балл — компромисс между двумя методиками.
+      return {
+        ...t,
+        groupCount: t.groups.size,
+        avgByStudent,
+        avgByGroup,
+        avgScore: (avgByStudent + avgByGroup) / 2,
+      };
+    });
   }, [rows]);
 
   const sortedTeachers = useMemo(() => sortRows(byTeacher, sortKey, sortDir), [byTeacher, sortKey, sortDir]);
@@ -45,7 +62,7 @@ export default function TeachersTab({ rows }) {
               <Td bold>{i + 1}. {t.teacher}</Td>
               <Td right mono>{t.students}</Td>
               <Td right mono>{t.groupCount}</Td>
-              <Td right mono bold>{t.avgScore.toFixed(2)}</Td>
+              <Td right mono bold title={`по ученикам: ${t.avgByStudent.toFixed(2)} · по группам: ${t.avgByGroup.toFixed(2)}`}>{t.avgScore.toFixed(2)}</Td>
             </tr>
           ))}
         </tbody>

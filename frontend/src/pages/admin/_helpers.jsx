@@ -43,6 +43,6 @@ export function sortRows(rows, key, dir) {
   });
 }
 
-export function Td({ children, right, mono, bold }) {
-  return <td style={{ padding: '8px 10px', textAlign: right ? 'right' : 'left', fontWeight: bold ? 900 : 600, fontSize: mono ? 13 : 12, fontVariantNumeric: mono ? 'tabular-nums' : 'normal', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}>{children}</td>;
+export function Td({ children, right, mono, bold, title }) {
+  return <td title={title} style={{ padding: '8px 10px', textAlign: right ? 'right' : 'left', fontWeight: bold ? 900 : 600, fontSize: mono ? 13 : 12, fontVariantNumeric: mono ? 'tabular-nums' : 'normal', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }}>{children}</td>;
 }
