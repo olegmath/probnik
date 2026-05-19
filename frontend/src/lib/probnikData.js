@@ -242,6 +242,7 @@ function rowMatchesSheetSubject(sheetName, rowSubject) {
 
 export async function loadSheetsData() {
   const allStudents = {};
+  const probnikCatalog = {};
   try {
     const sheetsData = await fetch('/data.json').then((r) => r.json());
     for (const [sheetIndex, [sheetName, rows]] of Object.entries(sheetsData).entries()) {
@@ -258,6 +259,7 @@ export async function loadSheetsData() {
       else if (sheetName.includes('ФИЗ')) subjectName = 'физика ' + examType;
       else if (sheetName.includes('ИСТ')) subjectName = 'история ЕГЭ';
       if (!subjectName) continue;
+      probnikCatalog[subjectName] = (probnikCatalog[subjectName] || 0) + 1;
 
       const numTasks = getTaskCount(subjectName);
       for (let i = 2; i < rows.length; i++) {
@@ -308,9 +310,9 @@ export async function loadSheetsData() {
       if (Object.keys(ogeSubjects).length === 0) delete allStudents[ogeKey];
     }
 
-    return processStudentData(allStudents);
+    return { students: processStudentData(allStudents), catalog: probnikCatalog };
   } catch {
-    return {};
+    return { students: {}, catalog: {} };
   }
 }
 

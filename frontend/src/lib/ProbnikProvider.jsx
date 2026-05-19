@@ -48,17 +48,19 @@ export function ProbnikProvider({ children }) {
     examTemplates: {},
     scoresData: {},
     taskThemes: {},
+    probnikCatalog: {},
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([loadExamTemplates(), loadScoresData(), loadTaskThemes()])
       .then(([examTemplates, scoresData, taskThemes]) =>
-        loadSheetsData().then((allStudents) => ({
+        loadSheetsData().then(({ students, catalog }) => ({
           examTemplates,
           scoresData,
           taskThemes,
-          allStudents,
+          allStudents: students,
+          probnikCatalog: catalog,
         }))
       )
       .then((data) => {

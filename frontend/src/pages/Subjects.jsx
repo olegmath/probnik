@@ -7,12 +7,40 @@ import Squiggle from '../components/decor/Squiggle.jsx';
 export default function Subjects() {
   const { id } = useParams();
   const { state } = useLocation();
-  const { allStudents } = useProbnik();
+  const { allStudents, probnikCatalog = {} } = useProbnik();
   const navigate = useNavigate();
 
   const student = state?.student || allStudents[decodeURIComponent(id)];
   if (!student) {
     return <div style={{ padding: 40 }}>Ученик не найден</div>;
+  }
+
+  const writtenTotal = student.subjects.reduce((s, x) => s + (x.attempts?.length || 0), 0);
+  const heldTotal = student.subjects.reduce((s, x) => s + (probnikCatalog[x.name] || 0), 0);
+
+  if (writtenTotal === 0) {
+    return (
+      <main className="subjects-main" style={{ flex: 1, maxWidth: 760, margin: '0 auto', width: '100%', padding: '40px 32px', position: 'relative', overflow: 'hidden' }}>
+        <Squiggle style={{ position: 'absolute', top: -10, right: -20, opacity: 0.6, pointerEvents: 'none' }} />
+        <button onClick={() => navigate(-1)} style={backBtnStyle}>← Назад</button>
+        <div className="fade-up" style={{ marginBottom: 40 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <Chip>{student.examType} 2026</Chip>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ученик</div>
+          <h1 className="subjects-title" style={{ fontSize: 48, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, color: 'var(--black)' }}>
+            {student.name.split(' ')[0]}<br />
+            <span style={{ fontStyle: 'italic', color: 'var(--blue)' }}>{student.name.split(' ').slice(1).join(' ')}</span>
+          </h1>
+          <div style={{ fontSize: 14, color: 'var(--gray)', marginTop: 8, fontWeight: 500 }}>{student.grade} класс</div>
+        </div>
+        <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--black)' }}>Ученик ещё не писал ни одного пробника</div>
+          <div style={{ fontSize: 14, color: 'var(--gray)', fontWeight: 500, marginTop: 8 }}>Результаты появятся здесь, как только он напишет первый пробник.</div>
+        </div>
+      </main>
+    );
   }
 
   const avg = Math.round(student.subjects.reduce((s, x) => s + (x.secondaryScore || 0), 0) / student.subjects.length);
@@ -64,6 +92,10 @@ export default function Subjects() {
             <span style={{ fontSize: 22, fontWeight: 900 }}>{student.subjects.length}</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{pluralizeSubject(student.subjects.length)}</span>
           </div>
+          <div style={{ background: '#f5f5f5', borderRadius: 12, padding: '10px 20px', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 22, fontWeight: 900 }}>{writtenTotal} из {Math.max(heldTotal, writtenTotal)}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--gray)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{pluralizeAttempts(Math.max(heldTotal, writtenTotal))}</span>
+          </div>
         </div>
       </div>
 
@@ -75,6 +107,8 @@ export default function Subjects() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {student.subjects.map((subj, i) => {
           const isOGE = student.examType === 'ОГЭ';
+          const written = subj.attempts?.length || 0;
+          const held = probnikCatalog[subj.name] || 0;
           const p = subj.secondaryScore || 0;
           const dotColor = isOGE
             ? (p >= 4 ? '#34b87a' : p >= 3 ? '#f5a623' : '#e05454')
@@ -98,7 +132,9 @@ export default function Subjects() {
                   <div style={{ fontWeight: 800, letterSpacing: '-0.01em', fontSize: '20px' }}>{subj.name}</div>
                   {subj.date && (
                     <div style={{ fontSize: 12, color: 'var(--gray)', fontWeight: 700, marginTop: 4 }}>
-                      {subj.attempts && subj.attempts.length > 1 ? `${subj.attempts.length} ${pluralizeAttempts(subj.attempts.length)}, последний ${subj.date}` : `Пробник ${subj.date}`}
+                      {held > 0
+                        ? `${written} из ${Math.max(held, written)} ${pluralizeAttempts(Math.max(held, written))}, последний ${subj.date}`
+                        : (written > 1 ? `${written} ${pluralizeAttempts(written)}, последний ${subj.date}` : `Пробник ${subj.date}`)}
                     </div>
                   )}
                 </div>
