@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { SortTh, Td, sortRows, pill } from '../_helpers.jsx';
+import { SortTh, Td, sortRows, pill, Sel } from '../_helpers.jsx';
 import { getJournalSummary } from '../../../lib/marathonApi.js';
+
+// Бакет «Экзамен»: 10 класс (grade==='10') пишет ЕГЭ-формат, но выносится отдельно.
+const levelBucket = (r) => (r.grade === '10' ? '10 класс' : (r.level || ''));
+const LEVEL_ORDER = ['ОГЭ', 'ЕГЭ', '10 класс'];
+const sortLevels = (arr) => [...arr].sort((a, b) => {
+  const ia = LEVEL_ORDER.indexOf(a), ib = LEVEL_ORDER.indexOf(b);
+  return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+});
 
 const MODES = [
   { id: 'school', label: 'Школа' },
@@ -127,16 +135,8 @@ function GroupsView({ rows, sort }) {
   );
 }
 
-function StudentsView({ rows, sort, filters }) {
-  const filtered = useMemo(() => rows.filter((r) =>
-    (!filters.subject || r.subject === filters.subject) &&
-    (!filters.level || r.level === filters.level) &&
-    (!filters.grade || r.grade === filters.grade) &&
-    (!filters.teacher || r.teacher === filters.teacher) &&
-    (!filters.group || r.group === filters.group)
-  ), [rows, filters.subject, filters.level, filters.grade, filters.teacher, filters.group]);
-
-  const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort.key, sort.dir]);
+function StudentsView({ rows, sort }) {
+  const sorted = useMemo(() => sortRows(rows, sort.key, sort.dir), [rows, sort.key, sort.dir]);
 
   if (sorted.length === 0) return <div style={{ textAlign: 'center', padding: 40, color: 'var(--gray)' }}>Нет учеников</div>;
 
@@ -193,13 +193,35 @@ const DEFAULT_SORT_BY_MODE = {
   students: { key: 'integral', dir: 'desc' },
 };
 
-export default function GradesTab({ subject, level, grade, teacher, group }) {
+export default function GradesTab() {
   const [mode, setMode] = useState('students');
   const [data, setData] = useState({ school: null, groups: null, students: null });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sortKey, setSortKey] = useState('integral');
   const [sortDir, setSortDir] = useState('desc');
+
+  // Свои фильтры из данных журнала (вкл. 10 класс с преподами/группами) —
+  // марафон-фильтры из AdminDashboard сюда не подходят (в рейтингах 10кл нет).
+  const [subject, setSubject] = useState('');
+  const [levelSel, setLevelSel] = useState('');
+  const [teacher, setTeacher] = useState('');
+  const [group, setGroup] = useState('');
+
+  const studentRows = data.students?.students || [];
+  const subjects = useMemo(() => [...new Set(studentRows.map((r) => r.subject).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [studentRows]);
+  const levels = useMemo(() => sortLevels([...new Set(studentRows.filter((r) => !subject || r.subject === subject).map(levelBucket).filter(Boolean))]), [studentRows, subject]);
+  const teachers = useMemo(() => [...new Set(studentRows.filter((r) => (!subject || r.subject === subject) && (!levelSel || levelBucket(r) === levelSel)).map((r) => r.teacher).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [studentRows, subject, levelSel]);
+  const groups = useMemo(() => [...new Set(studentRows.filter((r) => (!subject || r.subject === subject) && (!levelSel || levelBucket(r) === levelSel) && (!teacher || r.teacher === teacher)).map((r) => r.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [studentRows, subject, levelSel, teacher]);
+
+  const filteredStudents = useMemo(() => studentRows.filter((r) =>
+    (!subject || r.subject === subject) &&
+    (!levelSel || levelBucket(r) === levelSel) &&
+    (!teacher || r.teacher === teacher) &&
+    (!group || r.group === group)
+  ), [studentRows, subject, levelSel, teacher, group]);
+
+  const resetFilters = () => { setSubject(''); setLevelSel(''); setTeacher(''); setGroup(''); };
 
   useEffect(() => {
     if (data[mode] != null) return;
@@ -237,6 +259,27 @@ export default function GradesTab({ subject, level, grade, teacher, group }) {
         {MODES.map((m) => pill(m.label, mode === m.id, () => setMode(m.id), 'var(--blue)'))}
       </div>
 
+      {mode === 'students' && studentRows.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', minWidth: 64 }}>Предмет</span>
+            {subjects.map((s) => pill(s, subject === s, () => { setSubject(subject === s ? '' : s); setTeacher(''); setGroup(''); }))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', minWidth: 64 }}>Класс</span>
+            {levels.map((l) => pill(l, levelSel === l, () => { setLevelSel(levelSel === l ? '' : l); setTeacher(''); setGroup(''); }, 'var(--blue)'))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--gray)', minWidth: 64 }}>Препод.</span>
+            {teachers.length > 0 && <Sel value={teacher} onChange={(v) => { setTeacher(v); setGroup(''); }} options={teachers} placeholder="Все преподаватели" />}
+            {teacher && groups.length > 0 && <Sel value={group} onChange={setGroup} options={groups} placeholder="Все группы" />}
+            {(subject || levelSel || teacher || group) && (
+              <button onClick={resetFilters} style={{ height: 36, padding: '0 12px', border: '2px solid var(--border)', borderRadius: 8, background: 'var(--white)', fontFamily: 'Inter', fontSize: 11, fontWeight: 800, cursor: 'pointer', color: 'var(--gray)' }}>Сбросить</button>
+            )}
+          </div>
+        </div>
+      )}
+
       {loading && <Loading />}
       {error && !loading && <ErrorBox message={error} />}
       {!loading && !error && current && (
@@ -244,11 +287,7 @@ export default function GradesTab({ subject, level, grade, teacher, group }) {
           {mode === 'school' && <SchoolView data={current} />}
           {mode === 'groups' && <GroupsView rows={current.groups || []} sort={sort} />}
           {mode === 'students' && (
-            <StudentsView
-              rows={current.students || []}
-              sort={sort}
-              filters={{ subject, level, grade, teacher, group }}
-            />
+            <StudentsView rows={filteredStudents} sort={sort} />
           )}
         </>
       )}
