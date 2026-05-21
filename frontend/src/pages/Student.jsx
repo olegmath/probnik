@@ -48,17 +48,20 @@ export default function Student() {
             <span className="student-card-title" style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>Пробники</span>
             <span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>Результаты и анализ тем</span>
           </Link>
-          <Link
-            to={`/student/${encodeURIComponent(id)}/errors`}
-            state={{ student }}
-            className="student-card"
-            style={cardStyle}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--blue-light)'; e.currentTarget.style.borderColor = 'var(--blue)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = 'var(--black)'; }}
-          >
-            <span className="student-card-title" style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>Карта ошибок марафона</span>
-            <span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>Дневной прогресс</span>
-          </Link>
+          {/* 10 класс марафон не пишет → карты ошибок марафона у них нет */}
+          {student.grade !== '10' && (
+            <Link
+              to={`/student/${encodeURIComponent(id)}/errors`}
+              state={{ student }}
+              className="student-card"
+              style={cardStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--blue-light)'; e.currentTarget.style.borderColor = 'var(--blue)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; e.currentTarget.style.borderColor = 'var(--black)'; }}
+            >
+              <span className="student-card-title" style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>Карта ошибок марафона</span>
+              <span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>Дневной прогресс</span>
+            </Link>
+          )}
           <Link
             to={`/student/${encodeURIComponent(id)}/year`}
             state={{ student }}
