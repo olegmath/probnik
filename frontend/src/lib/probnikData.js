@@ -259,7 +259,9 @@ export async function loadSheetsData() {
       else if (sheetName.includes('ФИЗ')) subjectName = 'физика ' + examType;
       else if (sheetName.includes('ИСТ')) subjectName = 'история ЕГЭ';
       if (!subjectName) continue;
-      probnikCatalog[subjectName] = (probnikCatalog[subjectName] || 0) + 1;
+      (probnikCatalog[subjectName] = probnikCatalog[subjectName] || []).push({
+        date: getProbnikDateFromSheetName(sheetName), sheetIndex,
+      });
 
       const numTasks = getTaskCount(subjectName);
       for (let i = 2; i < rows.length; i++) {
@@ -310,7 +312,14 @@ export async function loadSheetsData() {
       if (Object.keys(ogeSubjects).length === 0) delete allStudents[ogeKey];
     }
 
-    return { students: processStudentData(allStudents), catalog: probnikCatalog };
+    // Каталог → список дат пробников по предмету, новые сверху (как attempts).
+    const finalCatalog = {};
+    for (const [subjName, entries] of Object.entries(probnikCatalog)) {
+      finalCatalog[subjName] = [...entries]
+        .sort((a, b) => b.sheetIndex - a.sheetIndex)
+        .map((e) => e.date);
+    }
+    return { students: processStudentData(allStudents), catalog: finalCatalog };
   } catch {
     return { students: {}, catalog: {} };
   }

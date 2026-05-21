@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useProbnik } from '../lib/ProbnikProvider.jsx';
 import {
@@ -13,11 +13,14 @@ import ThemeAnalysis from '../components/ThemeAnalysis.jsx';
 import SubjectStats from '../components/SubjectStats.jsx';
 import { safeDecode } from '../lib/safeDecode';
 
+// День.месяц без года — для сопоставления дат каталога (21.05.2026) и попыток (21.05).
+const normDate = (d) => String(d || '').split('.').slice(0, 2).join('.');
+
 export default function ProbnikDetail() {
   const { id, subject: subjectParam } = useParams();
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { allStudents, scoresData, taskThemes } = useProbnik();
+  const { allStudents, scoresData, taskThemes, probnikCatalog = {} } = useProbnik();
 
   const student = state?.student || allStudents[safeDecode(id)];
   const subjectName = safeDecode(subjectParam || '');
@@ -27,18 +30,34 @@ export default function ProbnikDetail() {
   const [activeAttemptIndex, setActiveAttemptIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('attempts');
 
+  // Полный список пробников по предмету: все даты из каталога, новые сверху.
+  // Дате без попытки ученика ставим _written: false → заглушка «не писал».
+  const slots = useMemo(() => {
+    const written = subject?.attempts && subject.attempts.length > 0 ? subject.attempts : (subject ? [subject] : []);
+    const catalogDates = (probnikCatalog[subject?.name] || []).filter(Boolean);
+    if (catalogDates.length === 0) return written.map((a) => ({ ...a, _written: true }));
+    const byDate = {};
+    for (const a of written) byDate[normDate(a.date)] = a;
+    return catalogDates.map((d) => {
+      const hit = byDate[normDate(d)];
+      return hit ? { ...hit, _written: true } : { date: d, _written: false };
+    });
+  }, [subject, probnikCatalog]);
+
   useEffect(() => {
-    setActiveAttemptIndex(0);
+    const firstWritten = slots.findIndex((s) => s._written !== false);
+    setActiveAttemptIndex(firstWritten >= 0 ? firstWritten : 0);
     setActiveTab('attempts');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectName]);
 
   if (!student || !subject) {
     return <div style={{ padding: 40 }}>Предмет не найден</div>;
   }
 
-  const attempts = subject.attempts && subject.attempts.length > 0 ? subject.attempts : [subject];
-  const activeAttempt = attempts[Math.min(activeAttemptIndex, attempts.length - 1)] || subject;
-  const cur = { ...subject, ...activeAttempt, name: subject.name };
+  const activeSlot = slots[Math.min(activeAttemptIndex, slots.length - 1)] || subject;
+  const notWritten = activeSlot._written === false;
+  const cur = { ...subject, ...activeSlot, name: subject.name };
   const p = cur.secondaryScore || 0;
   const scoreColor = p >= 70 ? '#34b87a' : p >= 50 ? '#f5a623' : '#e05454';
   const totalTasks = cur.taskScores ? cur.taskScores.length : 0;
@@ -107,7 +126,7 @@ export default function ProbnikDetail() {
                 <span style={{ fontStyle: 'italic', color: 'var(--blue)' }}>{cur.name}</span>
               </h1>
             </div>
-            <div className="detail-score-row" style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+            {!notWritten && <div className="detail-score-row" style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
               <div style={{ border: '2px solid var(--black)', borderRadius: 12, padding: '10px 18px', textAlign: 'center', minWidth: 118 }}>
                 <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--gray)', marginBottom: 2 }}>Первичный</div>
                 <div style={{ fontSize: 42, fontWeight: 900, color: 'var(--blue)', lineHeight: 0.95, fontStyle: 'italic' }}>{cur.primaryScore}</div>
@@ -118,7 +137,7 @@ export default function ProbnikDetail() {
                 <div style={{ fontSize: 42, fontWeight: 900, color: scoreColor, lineHeight: 0.95, fontStyle: 'italic' }}>{p}</div>
                 <div style={{ fontSize: 11, color: scoreColor, marginTop: 1, fontWeight: 700 }}>{pluralizePoints(p)}</div>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -139,21 +158,37 @@ export default function ProbnikDetail() {
           })}
         </div>
 
-        {activeTab === 'attempts' && attempts.length > 1 && (
+        {activeTab === 'attempts' && slots.length > 1 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, flexShrink: 0 }}>
-            {attempts.map((attempt, index) => (
-              <button
-                key={`${attempt.date || attempt.sheetName || index}-${index}`}
-                onClick={() => setActiveAttemptIndex(index)}
-                style={{ border: index === activeAttemptIndex ? '2px solid var(--black)' : '2px solid var(--border)', background: index === activeAttemptIndex ? 'var(--black)' : 'var(--white)', color: index === activeAttemptIndex ? 'var(--white)' : 'var(--black)', borderRadius: 100, padding: '7px 14px', cursor: 'pointer', fontFamily: 'Inter', fontSize: 12, fontWeight: 850, whiteSpace: 'nowrap', transition: 'background 0.15s, color 0.15s, border-color 0.15s' }}
-              >
-                Пробник {attempt.date || index + 1}
-              </button>
-            ))}
+            {slots.map((slot, index) => {
+              const active = index === activeAttemptIndex;
+              const missed = slot._written === false;
+              return (
+                <button
+                  key={`${slot.date || slot.sheetName || index}-${index}`}
+                  onClick={() => setActiveAttemptIndex(index)}
+                  title={missed ? 'Ученик не писал этот пробник' : undefined}
+                  style={{ border: active ? '2px solid var(--black)' : missed ? '2px dashed var(--border)' : '2px solid var(--border)', background: active ? 'var(--black)' : 'var(--white)', color: active ? 'var(--white)' : missed ? 'var(--gray)' : 'var(--black)', borderRadius: 100, padding: '7px 14px', cursor: 'pointer', fontFamily: 'Inter', fontSize: 12, fontWeight: 850, whiteSpace: 'nowrap', transition: 'background 0.15s, color 0.15s, border-color 0.15s' }}
+                >
+                  {missed ? '✕ ' : ''}Пробник {slot.date || index + 1}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {activeTab === 'attempts' ? (
+          notWritten ? (
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: '48px 24px', textAlign: 'center', maxWidth: 480 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📝</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--black)' }}>Не писал этот пробник</div>
+                <div style={{ fontSize: 14, color: 'var(--gray)', fontWeight: 500, marginTop: 8 }}>
+                  Пробник {activeSlot.date} по предмету «{subject.name}» ученик не писал.
+                </div>
+              </div>
+            </div>
+          ) : (
           <div
             className="results-layout"
             style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12, width: '100%', flex: 1, minHeight: 0, overflow: 'hidden' }}
@@ -175,6 +210,7 @@ export default function ProbnikDetail() {
               </div>
             )}
           </div>
+          )
         ) : (
           <SubjectStats subject={subject} />
         )}

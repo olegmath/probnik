@@ -16,7 +16,7 @@ export default function Subjects() {
   }
 
   const writtenTotal = student.subjects.reduce((s, x) => s + (x.attempts?.length || 0), 0);
-  const heldTotal = student.subjects.reduce((s, x) => s + (probnikCatalog[x.name] || 0), 0);
+  const heldTotal = student.subjects.reduce((s, x) => s + (probnikCatalog[x.name]?.length || 0), 0);
 
   if (writtenTotal === 0) {
     return (
@@ -108,7 +108,7 @@ export default function Subjects() {
         {student.subjects.map((subj, i) => {
           const isOGE = student.examType === 'ОГЭ';
           const written = subj.attempts?.length || 0;
-          const held = probnikCatalog[subj.name] || 0;
+          const held = probnikCatalog[subj.name]?.length || 0;
           const p = subj.secondaryScore || 0;
           const dotColor = isOGE
             ? (p >= 4 ? '#34b87a' : p >= 3 ? '#f5a623' : '#e05454')
