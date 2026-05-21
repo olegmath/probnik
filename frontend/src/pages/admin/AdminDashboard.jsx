@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRatings, clearAdminKey } from '../../lib/marathonApi.js';
+import { getRatings, getStudents, clearAdminKey } from '../../lib/marathonApi.js';
 import { pill, Sel } from './_helpers.jsx';
 import DetailsTab from './tabs/DetailsTab.jsx';
 import TeachersTab from './tabs/TeachersTab.jsx';
@@ -33,6 +33,15 @@ export default function AdminDashboard() {
   const [group, setGroup] = useState('');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
+  // 10 класс марафон не пишут → их нет в рейтингах (rawRows). Берём наличие 10кл
+  // из публичного справочника журнала, чтобы показать пилл «10 класс» в фильтре.
+  const [has10, setHas10] = useState(false);
+
+  useEffect(() => {
+    getStudents()
+      .then((res) => setHas10((res?.students || []).some((s) => s.grade === '10')))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let pollTimer = null;
@@ -89,7 +98,11 @@ export default function AdminDashboard() {
   });
 
   const subjects = useMemo(() => [...new Set(rawRows.map((r) => r.subject).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows]);
-  const levels = useMemo(() => sortLevels([...new Set(rawRows.filter((r) => !subject || r.subject === subject).map(levelBucket).filter(Boolean))]), [rawRows, subject]);
+  const levels = useMemo(() => {
+    const set = new Set(rawRows.filter((r) => !subject || r.subject === subject).map(levelBucket).filter(Boolean));
+    if (has10) set.add('10 класс'); // 10кл нет в rawRows (рейтинги), но есть в журнале (ДЗ/КР)
+    return sortLevels([...set]);
+  }, [rawRows, subject, has10]);
   const teachers = useMemo(() => [...new Set(rawRows.filter((r) => (!subject || r.subject === subject) && (!level || levelBucket(r) === level)).map((r) => r.teacher).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows, subject, level]);
   const groups = useMemo(() => [...new Set(rawRows.filter((r) => (!subject || r.subject === subject) && (!level || levelBucket(r) === level) && (!teacher || r.teacher === teacher)).map((r) => r.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows, subject, level, teacher]);
 
