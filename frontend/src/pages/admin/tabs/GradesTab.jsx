@@ -131,9 +131,10 @@ function StudentsView({ rows, sort, filters }) {
   const filtered = useMemo(() => rows.filter((r) =>
     (!filters.subject || r.subject === filters.subject) &&
     (!filters.level || r.level === filters.level) &&
+    (!filters.grade || r.grade === filters.grade) &&
     (!filters.teacher || r.teacher === filters.teacher) &&
     (!filters.group || r.group === filters.group)
-  ), [rows, filters.subject, filters.level, filters.teacher, filters.group]);
+  ), [rows, filters.subject, filters.level, filters.grade, filters.teacher, filters.group]);
 
   const sorted = useMemo(() => sortRows(filtered, sort.key, sort.dir), [filtered, sort.key, sort.dir]);
 
@@ -192,7 +193,7 @@ const DEFAULT_SORT_BY_MODE = {
   students: { key: 'integral', dir: 'desc' },
 };
 
-export default function GradesTab({ subject, level, teacher, group }) {
+export default function GradesTab({ subject, level, grade, teacher, group }) {
   const [mode, setMode] = useState('students');
   const [data, setData] = useState({ school: null, groups: null, students: null });
   const [loading, setLoading] = useState(false);
@@ -246,7 +247,7 @@ export default function GradesTab({ subject, level, teacher, group }) {
             <StudentsView
               rows={current.students || []}
               sort={sort}
-              filters={{ subject, level, teacher, group }}
+              filters={{ subject, level, grade, teacher, group }}
             />
           )}
         </>

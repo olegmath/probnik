@@ -79,14 +79,23 @@ export default function AdminDashboard() {
     navigate('/admin', { replace: true });
   };
 
+  // Бакет фильтра «Экзамен»: 10-классники (grade==='10') пишут ЕГЭ-формат (level==='ЕГЭ'),
+  // но в фильтре выносятся в отдельный «10 класс».
+  const levelBucket = (r) => (r.grade === '10' ? '10 класс' : r.level);
+  const LEVEL_ORDER = ['ОГЭ', 'ЕГЭ', '10 класс'];
+  const sortLevels = (arr) => [...arr].sort((a, b) => {
+    const ia = LEVEL_ORDER.indexOf(a), ib = LEVEL_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
   const subjects = useMemo(() => [...new Set(rawRows.map((r) => r.subject).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows]);
-  const levels = useMemo(() => [...new Set(rawRows.filter((r) => !subject || r.subject === subject).map((r) => r.level).filter(Boolean))].sort(), [rawRows, subject]);
-  const teachers = useMemo(() => [...new Set(rawRows.filter((r) => (!subject || r.subject === subject) && (!level || r.level === level)).map((r) => r.teacher).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows, subject, level]);
-  const groups = useMemo(() => [...new Set(rawRows.filter((r) => (!subject || r.subject === subject) && (!level || r.level === level) && (!teacher || r.teacher === teacher)).map((r) => r.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows, subject, level, teacher]);
+  const levels = useMemo(() => sortLevels([...new Set(rawRows.filter((r) => !subject || r.subject === subject).map(levelBucket).filter(Boolean))]), [rawRows, subject]);
+  const teachers = useMemo(() => [...new Set(rawRows.filter((r) => (!subject || r.subject === subject) && (!level || levelBucket(r) === level)).map((r) => r.teacher).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows, subject, level]);
+  const groups = useMemo(() => [...new Set(rawRows.filter((r) => (!subject || r.subject === subject) && (!level || levelBucket(r) === level) && (!teacher || r.teacher === teacher)).map((r) => r.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')), [rawRows, subject, level, teacher]);
 
   const filteredRows = useMemo(() => rawRows.filter((r) =>
     (!subject || r.subject === subject) &&
-    (!level || r.level === level) &&
+    (!level || levelBucket(r) === level) &&
     (!teacher || r.teacher === teacher) &&
     (!group || r.group === group)
   ), [rawRows, subject, level, teacher, group]);
@@ -200,7 +209,7 @@ export default function AdminDashboard() {
       {activeTab === 'details' && <DetailsTab rows={filteredRows} period={period} onSaved={reloadRatings} />}
       {activeTab === 'teachers' && <TeachersTab rows={filteredRows} />}
       {activeTab === 'daily' && <DailyTab rows={filteredRows} />}
-      {activeTab === 'grades' && <GradesTab subject={subject} level={level} teacher={teacher} group={group} />}
+      {activeTab === 'grades' && <GradesTab subject={subject} level={level === '10 класс' ? 'ЕГЭ' : level} grade={level === '10 класс' ? '10' : ''} teacher={teacher} group={group} />}
       {activeTab === 'group-errors' && <GroupErrorsTab allRows={rawRows} />}
       {activeTab === 'reports' && <ReportsTab allRows={rawRows} onLogout={handleLogout} />}
     </main>

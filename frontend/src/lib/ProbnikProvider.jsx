@@ -4,6 +4,8 @@ import {
   loadScoresData,
   loadTaskThemes,
   loadSheetsData,
+  resolveGrade,
+  buildGradeByName,
 } from './probnikData.js';
 import { getRatings } from './marathonApi.js';
 import {
@@ -19,7 +21,10 @@ function buildMarathonOnlyStudents(rows, existingStudents) {
   for (const row of rows) {
     if (!row.name || !row.level || !row.subject) continue;
     const searchName = normalizePersonName(row.name);
-    const key = `${searchName}|${row.level}`;
+    const grade = resolveGrade(row.grade, row.level);
+    // Ключ включает класс — так тёзки 10/11 (оба ЕГЭ) не склеиваются,
+    // а 10-классник с пробником совпадёт со своей probnik-записью (она тоже grade-keyed).
+    const key = `${searchName}|${row.level}|${grade}`;
     if (key in existingStudents) continue;
     if (!additions[key]) {
       additions[key] = {
@@ -28,7 +33,7 @@ function buildMarathonOnlyStudents(rows, existingStudents) {
         searchKey: normalizeStudentSearchName(row.name),
         searchKeys: getStudentSearchNames(row.name),
         examType: row.level,
-        grade: row.level === 'ЕГЭ' ? '11' : '9',
+        grade,
         subjects: [],
         id: key,
         _marathonOnly: true,
@@ -53,32 +58,30 @@ export function ProbnikProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([loadExamTemplates(), loadScoresData(), loadTaskThemes()])
-      .then(([examTemplates, scoresData, taskThemes]) =>
-        loadSheetsData().then(({ students, catalog }) => ({
-          examTemplates,
-          scoresData,
-          taskThemes,
-          allStudents: students,
-          probnikCatalog: catalog,
-        }))
-      )
+    // Сначала тянем marathon-рейтинги: они источник истины по классу (gradeByName).
+    // Падение/пустой ответ не блокирует probnik — класс довычислится из examType.
+    Promise.all([
+      loadExamTemplates(),
+      loadScoresData(),
+      loadTaskThemes(),
+      getRatings({ isPublic: true }).then((res) => res?.rows || []).catch(() => []),
+    ])
+      .then(([examTemplates, scoresData, taskThemes, ratingRows]) => {
+        const gradeByName = buildGradeByName(ratingRows);
+        return loadSheetsData(gradeByName).then(({ students, catalog }) => {
+          const additions = buildMarathonOnlyStudents(ratingRows, students);
+          return {
+            examTemplates,
+            scoresData,
+            taskThemes,
+            allStudents: { ...students, ...additions },
+            probnikCatalog: catalog,
+          };
+        });
+      })
       .then((data) => {
         setData(data);
         setLoading(false);
-
-        getRatings({ isPublic: true })
-          .then((res) => {
-            const rows = res?.rows || [];
-            if (!rows.length) return;
-            const additions = buildMarathonOnlyStudents(rows, data.allStudents);
-            if (!Object.keys(additions).length) return;
-            setData((prev) => ({
-              ...prev,
-              allStudents: { ...prev.allStudents, ...additions },
-            }));
-          })
-          .catch(() => {});
       })
       .catch(() => setLoading(false));
   }, []);

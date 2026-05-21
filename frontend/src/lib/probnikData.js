@@ -4,6 +4,35 @@ import {
   getStudentSearchNames,
 } from './normalizeName.js';
 
+// Единый источник правды для «класса» ученика.
+// gradeRaw — поле grade с бэкенда ("9"/"10"/"11") либо undefined для probnik-only.
+// examType — "ЕГЭ"/"ОГЭ" (fallback, когда grade не пришёл).
+export function resolveGrade(gradeRaw, examType) {
+  if (gradeRaw === '9' || gradeRaw === '10' || gradeRaw === '11') return gradeRaw;
+  return examType === 'ЕГЭ' ? '11' : '9';
+}
+
+// Карта «нормализованное имя → класс» из marathon-строк (источник истины по классу).
+// Если у одного имени в marathon встречаются разные классы (тёзки 10/11) — имя
+// помечается неоднозначным и из карты исключается (fallback к examType-логике).
+export function buildGradeByName(rows) {
+  const map = {};
+  const ambiguous = new Set();
+  for (const row of rows || []) {
+    if (!row.name) continue;
+    const grade = resolveGrade(row.grade, row.level);
+    const name = normalizePersonName(row.name);
+    if (ambiguous.has(name)) continue;
+    if (name in map && map[name] !== grade) {
+      ambiguous.add(name);
+      delete map[name];
+      continue;
+    }
+    map[name] = grade;
+  }
+  return map;
+}
+
 export async function loadExamTemplates() {
   try {
     return await fetch('/examTemplates.json').then((r) => r.json());
@@ -240,7 +269,7 @@ function rowMatchesSheetSubject(sheetName, rowSubject) {
   return String(rowSubject || '').toLowerCase().includes(expected);
 }
 
-export async function loadSheetsData() {
+export async function loadSheetsData(gradeByName = {}) {
   const allStudents = {};
   const probnikCatalog = {};
   try {
@@ -319,7 +348,7 @@ export async function loadSheetsData() {
         .sort((a, b) => b.sheetIndex - a.sheetIndex)
         .map((e) => e.date);
     }
-    return { students: processStudentData(allStudents), catalog: finalCatalog };
+    return { students: processStudentData(allStudents, gradeByName), catalog: finalCatalog };
   } catch {
     return { students: {}, catalog: {} };
   }
@@ -339,9 +368,9 @@ function deduplicateAttempts(attempts) {
   });
 }
 
-function processStudentData(allStudents) {
+function processStudentData(allStudents, gradeByName = {}) {
   const result = {};
-  for (const [key, student] of Object.entries(allStudents)) {
+  for (const [, student] of Object.entries(allStudents)) {
     const subjects = [];
     for (const subjectData of Object.values(student.subjects)) {
       const attempts = sortAttemptsByDate(deduplicateAttempts(subjectData.attempts || []));
@@ -359,11 +388,14 @@ function processStudentData(allStudents) {
     }
     if (subjects.length > 0) {
       const examType = subjects[0].examType;
-      result[key] = {
+      // Класс — источник истины marathon (gradeByName по имени); для probnik-only fallback из examType.
+      const grade = resolveGrade(gradeByName[student.searchName], examType);
+      const id = `${student.searchName}|${examType}|${grade}`;
+      result[id] = {
         name: student.name, searchName: student.searchName,
         searchKey: student.searchKey, searchKeys: student.searchKeys,
-        id: `${student.searchName}|${examType}`,
-        examType, grade: examType === 'ЕГЭ' ? '11' : '9', subjects,
+        id,
+        examType, grade, subjects,
       };
     }
   }
