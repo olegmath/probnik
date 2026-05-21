@@ -126,8 +126,8 @@ export default function Rating() {
   useEffect(() => {
     getRatings({ isPublic: true })
       .then((res) => {
-        // 10 классы марафон не пишут — исключаем их из рейтинга (приходят в /api/ratings для Поиска/Учебного года).
-        const rows = (res?.rows || []).filter((r) => r.grade !== '10');
+        // В /api/ratings 10 класс приходит только как реальные участники марафона — показываем их.
+        const rows = res?.rows || [];
         setRawRows(rows);
         if (rows.length > 0) {
           setActiveSubject(rows[0].subject || '');

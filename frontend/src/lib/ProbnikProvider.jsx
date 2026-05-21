@@ -75,13 +75,31 @@ export function ProbnikProvider({ children }) {
       .then(([examTemplates, scoresData, taskThemes, ratingRows, directoryRows]) => {
         const allRows = [...ratingRows, ...directoryRows];
         const gradeByName = buildGradeByName(allRows);
+        // Участники марафона — только те, кто есть в рейтингах (/api/ratings).
+        // Справочник журнала (/api/students) сюда НЕ входит: в нём 10 класс есть
+        // всегда, но марафон пишут не все.
+        // Класс резолвим через gradeByName (журнал — источник истины), а не из самой
+        // строки: у ТПП-групп grade пустой и fallback дал бы "11", тогда как десятиклассник
+        // в ТПП реально grade "10" (из журнала). Ключ совпадает с id-составляющими ученика.
+        const marathonKeys = new Set(
+          ratingRows
+            .filter((r) => r.name)
+            .map((r) => {
+              const searchName = normalizePersonName(r.name);
+              return `${searchName}|${resolveGrade(r.grade || gradeByName[searchName], r.level)}`;
+            })
+        );
         return loadSheetsData(gradeByName).then(({ students, catalog }) => {
           const additions = buildMarathonOnlyStudents(allRows, students, gradeByName);
+          const stamp = (s) => ({ ...s, hasMarathon: marathonKeys.has(`${s.searchName}|${s.grade}`) });
+          const allStudents = Object.fromEntries(
+            Object.entries({ ...students, ...additions }).map(([k, v]) => [k, stamp(v)])
+          );
           return {
             examTemplates,
             scoresData,
             taskThemes,
-            allStudents: { ...students, ...additions },
+            allStudents,
             probnikCatalog: catalog,
           };
         });

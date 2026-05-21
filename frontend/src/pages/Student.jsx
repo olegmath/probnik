@@ -48,8 +48,8 @@ export default function Student() {
             <span className="student-card-title" style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>Пробники</span>
             <span style={{ fontSize: 13, color: 'var(--gray)', fontWeight: 600, marginTop: 4 }}>Результаты и анализ тем</span>
           </Link>
-          {/* 10 класс марафон не пишет → карты ошибок марафона у них нет */}
-          {student.grade !== '10' && (
+          {/* 10 класс в массе марафон не пишет → карту ошибок показываем только участникам (есть в рейтингах марафона) */}
+          {(student.grade !== '10' || student.hasMarathon) && (
             <Link
               to={`/student/${encodeURIComponent(id)}/errors`}
               state={{ student }}
