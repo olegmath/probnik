@@ -33,6 +33,15 @@ function ColoredPct({ value, digits = 1 }) {
   return <span style={{ color: scoreColor(value), fontWeight: 900 }}>{Number(value).toFixed(digits)}%</span>;
 }
 
+// Обрезка длинного текста с многоточием — освобождает место под доп. колонки.
+function Trunc({ text, max = 130 }) {
+  return (
+    <span style={{ display: 'inline-block', maxWidth: max, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}>
+      {text}
+    </span>
+  );
+}
+
 function Loading() {
   return (
     <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -76,12 +85,14 @@ function TopList({ title, items, valueKey = 'integral' }) {
 function SchoolView({ data }) {
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 16 }}>
         <MetricCard label="Учеников" value={data.studentsCount ?? 0} />
         <MetricCard label="Групп" value={data.groupsCount ?? 0} />
         <MetricCard label="Посещ. ср." value={fmtPct(data.attendancePct, 0)} color={scoreColor(data.attendancePct)} />
-        <MetricCard label="ДЗ ср." value={fmtPct(data.hwAvg, 0)} color={scoreColor(data.hwAvg)} />
-        <MetricCard label="КР ср." value={fmtPct(data.krAvg, 0)} color={scoreColor(data.krAvg)} />
+        <MetricCard label="ДЗ сдел. ср." value={fmtPct(data.hwDonePct, 0)} color={scoreColor(data.hwDonePct)} />
+        <MetricCard label="ДЗ кач. ср." value={fmtPct(data.hwAvg, 0)} color={scoreColor(data.hwAvg)} />
+        <MetricCard label="КР сдел. ср." value={fmtPct(data.krDonePct, 0)} color={scoreColor(data.krDonePct)} />
+        <MetricCard label="КР кач. ср." value={fmtPct(data.krAvg, 0)} color={scoreColor(data.krAvg)} />
         <MetricCard label="Интеграл" value={fmtPct(data.integral, 1)} color={scoreColor(data.integral)} note={`${data.flagsCount ?? 0} флагов`} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
@@ -107,8 +118,10 @@ function GroupsView({ rows, sort }) {
             <SortTh sortKey="teacher" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on}>Преподаватель</SortTh>
             <SortTh sortKey="studentsCount" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>Учеников</SortTh>
             <SortTh sortKey="attendancePct" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>Посещ. %</SortTh>
-            <SortTh sortKey="hwAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>ДЗ %</SortTh>
-            <SortTh sortKey="krAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>КР %</SortTh>
+            <SortTh sortKey="hwDonePct" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>ДЗ сдел.</SortTh>
+            <SortTh sortKey="hwAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>ДЗ кач.</SortTh>
+            <SortTh sortKey="krDonePct" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>КР сдел.</SortTh>
+            <SortTh sortKey="krAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>КР кач.</SortTh>
             <SortTh sortKey="integral" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>Интеграл</SortTh>
             <SortTh sortKey="flagsCount" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>Флагов</SortTh>
           </tr>
@@ -121,7 +134,9 @@ function GroupsView({ rows, sort }) {
               <Td>{g.teacher || '—'}</Td>
               <Td right mono>{g.studentsCount}</Td>
               <Td right mono><ColoredPct value={g.attendancePct} digits={0} /></Td>
+              <Td right mono><ColoredPct value={g.hwDonePct} digits={0} /></Td>
               <Td right mono><ColoredPct value={g.hwAvg} digits={0} /></Td>
+              <Td right mono><ColoredPct value={g.krDonePct} digits={0} /></Td>
               <Td right mono><ColoredPct value={g.krAvg} digits={0} /></Td>
               <Td right mono><ColoredPct value={g.integral} digits={1} /></Td>
               <Td right mono>
@@ -148,8 +163,10 @@ function StudentsView({ rows, sort }) {
           <tr>
             <SortTh sortKey="name" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on}>Ученик</SortTh>
             <SortTh sortKey="group" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on}>Группа</SortTh>
-            <SortTh sortKey="hwAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>ДЗ %</SortTh>
-            <SortTh sortKey="krAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>КР %</SortTh>
+            <SortTh sortKey="hwDonePct" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>ДЗ сдел.</SortTh>
+            <SortTh sortKey="hwAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>ДЗ кач.</SortTh>
+            <SortTh sortKey="krDonePct" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>КР сдел.</SortTh>
+            <SortTh sortKey="krAvg" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>КР кач.</SortTh>
             <SortTh sortKey="attendancePct" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>Посещ. %</SortTh>
             <SortTh sortKey="lessonsTotal" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>Уроков</SortTh>
             <SortTh sortKey="maxStreak" currentKey={sort.key} currentDir={sort.dir} onSort={sort.on} right>Подряд</SortTh>
@@ -160,11 +177,16 @@ function StudentsView({ rows, sort }) {
         <tbody>
           {sorted.map((r, i) => (
             <tr key={`${r.name}||${r.group}||${i}`} title={(r.flags || []).join(' · ')}>
-              <Td bold>{r.name}</Td>
-              <Td>{r.group || '—'}</Td>
+              <Td bold title={r.name}><Trunc text={r.name} max={130} /></Td>
+              <Td title={r.group}><Trunc text={r.group || '—'} max={100} /></Td>
+              <Td right mono><ColoredPct value={r.hwDonePct} digits={0} /></Td>
               <Td right mono>
                 <ColoredPct value={r.hwAvg} digits={1} />
                 {r.hwCount > 0 && <span style={{ fontSize: 10, color: 'var(--gray)', marginLeft: 4 }}>({r.hwCount})</span>}
+              </Td>
+              <Td right mono>
+                <ColoredPct value={r.krDonePct} digits={0} />
+                {r.krTotal > 0 && <span style={{ fontSize: 10, color: 'var(--gray)', marginLeft: 4 }}>({r.krCount}/{r.krTotal})</span>}
               </Td>
               <Td right mono>
                 <ColoredPct value={r.krAvg} digits={1} />
