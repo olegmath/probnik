@@ -13,14 +13,20 @@ export function resolveGrade(gradeRaw, examType) {
 }
 
 // Карта «нормализованное имя → класс» из marathon-строк (источник истины по классу).
-// Если у одного имени в marathon встречаются разные классы (тёзки 10/11) — имя
-// помечается неоднозначным и из карты исключается (fallback к examType-логике).
+// Учитываем ТОЛЬКО строки с явным классом ("9"/"10"/"11"): строки без grade
+// (напр. ТПП-группы рейтинга — "ТПП - МАТЕМАТИКА ЕГЭ") пропускаем, иначе их
+// examType-fallback ("11" для ЕГЭ) затёк бы в карту как настоящий сигнал и создал
+// ложную ambiguity для десятиклассника (его реальный "10" из журнала vs fallback "11").
+// Fallback по examType остаётся только в точке применения (resolveGrade).
+// Если у одного имени встречаются разные ЯВНЫЕ классы (тёзки 10/11) — имя
+// помечается неоднозначным и из карты исключается.
 export function buildGradeByName(rows) {
   const map = {};
   const ambiguous = new Set();
   for (const row of rows || []) {
     if (!row.name) continue;
-    const grade = resolveGrade(row.grade, row.level);
+    const grade = row.grade;
+    if (grade !== '9' && grade !== '10' && grade !== '11') continue;
     const name = normalizePersonName(row.name);
     if (ambiguous.has(name)) continue;
     if (name in map && map[name] !== grade) {

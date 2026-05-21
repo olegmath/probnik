@@ -16,12 +16,16 @@ import {
 
 const ProbnikContext = createContext(null);
 
-function buildMarathonOnlyStudents(rows, existingStudents) {
+function buildMarathonOnlyStudents(rows, existingStudents, gradeByName = {}) {
   const additions = {};
   for (const row of rows) {
     if (!row.name || !row.level || !row.subject) continue;
     const searchName = normalizePersonName(row.name);
-    const grade = resolveGrade(row.grade, row.level);
+    // Класс резолвим тем же источником истины, что и probnik-запись (gradeByName):
+    // явный grade строки > карта по имени > examType-fallback. Иначе строки с пустым
+    // grade (ТПП-рейтинги) дали бы fallback "11" и создали фантом |ЕГЭ|11 рядом с
+    // настоящей записью десятиклассника |ЕГЭ|10.
+    const grade = resolveGrade(row.grade || gradeByName[searchName], row.level);
     // Ключ включает класс — так тёзки 10/11 (оба ЕГЭ) не склеиваются,
     // а 10-классник с пробником совпадёт со своей probnik-записью (она тоже grade-keyed).
     const key = `${searchName}|${row.level}|${grade}`;
@@ -72,7 +76,7 @@ export function ProbnikProvider({ children }) {
         const allRows = [...ratingRows, ...directoryRows];
         const gradeByName = buildGradeByName(allRows);
         return loadSheetsData(gradeByName).then(({ students, catalog }) => {
-          const additions = buildMarathonOnlyStudents(allRows, students);
+          const additions = buildMarathonOnlyStudents(allRows, students, gradeByName);
           return {
             examTemplates,
             scoresData,
