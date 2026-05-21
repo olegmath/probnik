@@ -48,6 +48,11 @@ export async function getRatings({ isPublic = true, periodFrom = '', periodTo = 
   return apiFetch('/api/ratings', params, !isPublic);
 }
 
+// Публичный справочник учеников из журнала (включает 10 класс, которого нет в рейтингах).
+export async function getStudents() {
+  return apiFetch('/api/students', {}, false);
+}
+
 export async function getErrorMap({ studentName, subject, level, periodFrom = '', periodTo = '' }) {
   return apiFetch('/api/error-map', { studentName, subject, level, periodFrom, periodTo }, true);
 }

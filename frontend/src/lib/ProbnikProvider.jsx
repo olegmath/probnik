@@ -7,7 +7,7 @@ import {
   resolveGrade,
   buildGradeByName,
 } from './probnikData.js';
-import { getRatings } from './marathonApi.js';
+import { getRatings, getStudents } from './marathonApi.js';
 import {
   normalizePersonName,
   normalizeStudentSearchName,
@@ -58,18 +58,21 @@ export function ProbnikProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Сначала тянем marathon-рейтинги: они источник истины по классу (gradeByName).
+    // Тянем marathon-рейтинги + публичный справочник журнала: вместе они источник
+    // истины по классу (gradeByName). Справочник добавляет 10 класс, которого нет в рейтингах.
     // Падение/пустой ответ не блокирует probnik — класс довычислится из examType.
     Promise.all([
       loadExamTemplates(),
       loadScoresData(),
       loadTaskThemes(),
       getRatings({ isPublic: true }).then((res) => res?.rows || []).catch(() => []),
+      getStudents().then((res) => res?.students || []).catch(() => []),
     ])
-      .then(([examTemplates, scoresData, taskThemes, ratingRows]) => {
-        const gradeByName = buildGradeByName(ratingRows);
+      .then(([examTemplates, scoresData, taskThemes, ratingRows, directoryRows]) => {
+        const allRows = [...ratingRows, ...directoryRows];
+        const gradeByName = buildGradeByName(allRows);
         return loadSheetsData(gradeByName).then(({ students, catalog }) => {
-          const additions = buildMarathonOnlyStudents(ratingRows, students);
+          const additions = buildMarathonOnlyStudents(allRows, students);
           return {
             examTemplates,
             scoresData,
