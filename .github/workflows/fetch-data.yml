@@ -41,5 +41,5 @@ jobs:
       - name: Trigger Pages deploy
         if: steps.commit.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_DISPATCH }}
         run: gh workflow run "Deploy to GitHub Pages"
