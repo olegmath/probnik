@@ -99,9 +99,9 @@ function OverviewTab({ data }) {
       <div className="year-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12, marginBottom: 24 }}>
         <SummaryCard
           label="Посещаемость"
-          value={fmtPct(attendance.pct, 0)}
-          note={`был ${attendance.was} / ${attendance.total}`}
-          color={pctColor(attendance.pct)}
+          value={fmtPct(attendance.pct_excl_sick ?? attendance.pct, 0)}
+          note={`был ${attendance.was} / ${attendance.total}${attendance.sick > 0 ? ` · с болезнями ${fmtPct(attendance.pct, 0)}` : ''}`}
+          color={pctColor(attendance.pct_excl_sick ?? attendance.pct)}
         />
         <SummaryCard
           label="Сдано ДЗ"
@@ -118,7 +118,7 @@ function OverviewTab({ data }) {
         <SummaryCard
           label="Среднее КР"
           value={fmtPct(kr.avg, 0)}
-          note={`${kr.count} КР`}
+          note={kr.total ? `написано ${kr.count} из ${kr.total}` : `${kr.count} КР`}
           color={pctColor(kr.avg)}
         />
       </div>
@@ -149,9 +149,9 @@ function OverviewTab({ data }) {
             <Td><span style={{ fontWeight: 800 }}>{m.month}</span></Td>
             <Td>
               <span style={{ fontWeight: 800 }}>{m.was}</span>
-              <span style={{ color: 'var(--gray)', fontWeight: 600 }}> / {m.absent + m.sick}</span>
+              <span style={{ color: 'var(--gray)', fontWeight: 600 }}> / {m.absent}{m.sick > 0 ? ` (болел ${m.sick})` : ''}</span>
             </Td>
-            <Td><span style={{ fontWeight: 800, color: pctColor(m.pct) }}>{Math.round(m.pct)}%</span></Td>
+            <Td><span style={{ fontWeight: 800, color: pctColor(m.pct_excl_sick ?? m.pct) }}>{Math.round(m.pct_excl_sick ?? m.pct)}%</span></Td>
           </div>
         ))}
       </div>
@@ -236,7 +236,7 @@ function TestsTab({ data }) {
   return (
     <div>
       <div className="gt-summary-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
-        <SummaryCard label="Средний КР" value={fmtPct(kr.avg, 0)} note={`${kr.count} работ`} color={pctColor(kr.avg)} />
+        <SummaryCard label="Средний КР" value={fmtPct(kr.avg, 0)} note={kr.total ? `написано ${kr.count} из ${kr.total}` : `${kr.count} работ`} color={pctColor(kr.avg)} />
         <SummaryCard label="Лучшая" value={list.length ? `${Math.round(Math.max(...points))}%` : '—'} note="за год" />
       </div>
 
@@ -276,14 +276,15 @@ function TestsTab({ data }) {
 function AttendanceTab({ data }) {
   const { attendance } = data;
   const months = attendance.by_month || [];
-  const points = months.map((m) => m.pct);
+  const points = months.map((m) => m.pct_excl_sick ?? m.pct);
   const labels = months.map((m) => m.month);
 
   return (
     <div>
-      <div className="gt-summary-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div className="gt-summary-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16 }}>
         <SummaryCard label="Был" value={attendance.was} color="#16a34a" note={`из ${attendance.total} занятий`} />
-        <SummaryCard label="Пропустил" value={attendance.absent + attendance.sick} color={(attendance.absent + attendance.sick) > 5 ? '#dc2626' : 'var(--black)'} note="вкл. болезни" />
+        <SummaryCard label="Пропустил" value={attendance.absent} color={attendance.absent > 5 ? '#dc2626' : 'var(--black)'} note="без уважительной" />
+        <SummaryCard label="Болел" value={attendance.sick} note="не снижает %" />
         <SummaryCard label="Подряд пропусков" value={attendance.max_streak} color={attendance.max_streak >= 3 ? '#dc2626' : 'var(--black)'} note="максимум" />
       </div>
 
@@ -296,22 +297,24 @@ function AttendanceTab({ data }) {
         <div style={{ border: '2px dashed var(--border)', borderRadius: 16, padding: 40, textAlign: 'center', color: 'var(--gray)' }}>Нет данных о посещениях</div>
       ) : (
         <div className="gt-table-scroll" style={{ border: '2px solid var(--black)', borderRadius: 16, overflow: 'hidden' }}>
-          <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
+          <div className="gt-table-row" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr', background: 'var(--black)', color: 'var(--white)' }}>
             <Th>Месяц</Th>
             <Th>Был</Th>
             <Th>Пропустил</Th>
+            <Th>Болел</Th>
             <Th>Посещ.</Th>
           </div>
           {months.map((m, i) => (
             <div key={m.monthKey} className="gt-table-row" style={{
-              display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr',
+              display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 1fr',
               borderTop: i === 0 ? 'none' : '1px solid var(--border)',
               background: i % 2 === 0 ? 'var(--white)' : '#fafafa',
             }}>
               <Td><span style={{ fontWeight: 800 }}>{m.month}</span></Td>
               <Td><span style={{ fontWeight: 800, color: '#16a34a' }}>{m.was}</span></Td>
-              <Td><span style={{ fontWeight: 800, color: (m.absent + m.sick) > 0 ? '#dc2626' : 'var(--gray)' }}>{m.absent + m.sick}</span></Td>
-              <Td><span style={{ fontWeight: 800, color: pctColor(m.pct) }}>{Math.round(m.pct)}%</span></Td>
+              <Td><span style={{ fontWeight: 800, color: m.absent > 0 ? '#dc2626' : 'var(--gray)' }}>{m.absent}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: 'var(--gray)' }}>{m.sick}</span></Td>
+              <Td><span style={{ fontWeight: 800, color: pctColor(m.pct_excl_sick ?? m.pct) }}>{Math.round(m.pct_excl_sick ?? m.pct)}%</span></Td>
             </div>
           ))}
         </div>
@@ -369,12 +372,18 @@ function computeAggregate(subjects) {
   const hwAvg = totalHwCount > 0
     ? subjects.reduce((s, sub) => s + (sub.homework?.avg || 0) * (sub.homework?.count || 0), 0) / totalHwCount
     : null;
-  const hwDonePct = subjects.some((s) => s.homework?.done_pct != null)
-    ? subjects.reduce((s, sub) => s + (sub.homework?.done_pct || 0), 0) / subjects.length
-    : null;
-  const hwNotOpenedPct = subjects.some((s) => s.homework?.not_opened_pct != null)
-    ? subjects.reduce((s, sub) => s + (sub.homework?.not_opened_pct || 0), 0) / subjects.length
-    : null;
+
+  // Проценты выполнения — взвешенно по подзадачам всех предметов,
+  // а не среднее по предметам (иначе предмет с 3 ДЗ весит как предмет с 27).
+  const subStatusTotals = {};
+  for (const sub of subjects) {
+    for (const [k, v] of Object.entries(sub.homework?.sub_status || {})) {
+      subStatusTotals[k] = (subStatusTotals[k] || 0) + v;
+    }
+  }
+  const totalSubs = Object.values(subStatusTotals).reduce((s, v) => s + v, 0);
+  const hwDonePct = totalSubs > 0 ? (subStatusTotals['Принято'] || 0) / totalSubs * 100 : null;
+  const hwNotOpenedPct = totalSubs > 0 ? (subStatusTotals['Не открывали'] || 0) / totalSubs * 100 : null;
   const hwDoneCount = subjects.reduce((s, sub) => s + (sub.homework?.done_count || 0), 0);
   const hwTrend = subjects.flatMap((sub) => sub.homework?.trend || [])
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -384,10 +393,36 @@ function computeAggregate(subjects) {
   const attSick = subjects.reduce((s, sub) => s + (sub.attendance?.sick || 0), 0);
   const attTotal = subjects.reduce((s, sub) => s + (sub.attendance?.total || 0), 0);
   const attPct = attTotal > 0 ? attWas / attTotal * 100 : null;
+  const attExclTotal = attWas + attAbsent;
+  const attPctExcl = attExclTotal > 0 ? attWas / attExclTotal * 100 : null;
   const attMaxStreak = Math.max(...subjects.map((s) => s.attendance?.max_streak || 0));
-  const attByMonth = subjects[0]?.attendance?.by_month || [];
+
+  // Помесячно — сумма по всем предметам (раньше показывался только первый предмет)
+  const monthMap = {};
+  for (const sub of subjects) {
+    for (const m of sub.attendance?.by_month || []) {
+      const cur = monthMap[m.monthKey] || { monthKey: m.monthKey, month: m.month, was: 0, absent: 0, sick: 0 };
+      cur.was += m.was || 0;
+      cur.absent += m.absent || 0;
+      cur.sick += m.sick || 0;
+      monthMap[m.monthKey] = cur;
+    }
+  }
+  const attByMonth = Object.values(monthMap)
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
+    .map((m) => {
+      const tot = m.was + m.absent + m.sick;
+      const totExcl = m.was + m.absent;
+      return {
+        ...m,
+        total: tot,
+        pct: tot > 0 ? m.was / tot * 100 : 0,
+        pct_excl_sick: totExcl > 0 ? m.was / totExcl * 100 : 0,
+      };
+    });
 
   const krCount = subjects.reduce((s, sub) => s + (sub.kr?.count || 0), 0);
+  const krTotal = subjects.reduce((s, sub) => s + (sub.kr?.total || 0), 0);
   const krAvg = krCount > 0
     ? subjects.reduce((s, sub) => s + (sub.kr?.avg || 0) * (sub.kr?.count || 0), 0) / krCount
     : null;
@@ -395,18 +430,24 @@ function computeAggregate(subjects) {
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   const flags = [...new Set(subjects.flatMap((s) => s.flags || []))];
-  const ranks = subjects[0]?.ranks;
 
   return {
     subject: 'Все предметы',
     group: subjects.map((s) => s.group).filter(Boolean).join(', '),
     teacher: null,
-    attendance: { pct: attPct != null ? Math.round(attPct * 10) / 10 : null, was: attWas, absent: attAbsent, sick: attSick, total: attTotal, max_streak: attMaxStreak, by_month: attByMonth },
-    homework: { avg: hwAvg != null ? Math.round(hwAvg * 10) / 10 : null, count: totalHwCount, total: totalHwEvents, done_count: hwDoneCount, done_pct: hwDonePct != null ? Math.round(hwDonePct * 10) / 10 : null, not_opened_pct: hwNotOpenedPct != null ? Math.round(hwNotOpenedPct * 10) / 10 : null, sub_status: {}, trend: hwTrend },
-    kr: { avg: krAvg != null ? Math.round(krAvg * 10) / 10 : null, count: krCount, list: krList },
+    attendance: {
+      pct: attPct != null ? Math.round(attPct * 10) / 10 : null,
+      pct_excl_sick: attPctExcl != null ? Math.round(attPctExcl * 10) / 10 : null,
+      was: attWas, absent: attAbsent, sick: attSick, total: attTotal,
+      max_streak: attMaxStreak, by_month: attByMonth,
+    },
+    homework: { avg: hwAvg != null ? Math.round(hwAvg * 10) / 10 : null, count: totalHwCount, total: totalHwEvents, done_count: hwDoneCount, done_pct: hwDonePct != null ? Math.round(hwDonePct * 10) / 10 : null, not_opened_pct: hwNotOpenedPct != null ? Math.round(hwNotOpenedPct * 10) / 10 : null, sub_status: subStatusTotals, trend: hwTrend },
+    kr: { avg: krAvg != null ? Math.round(krAvg * 10) / 10 : null, count: krCount, total: krTotal, list: krList },
     integral: null,
     flags,
-    ranks,
+    // У агрегата «Все предметы» нет осмысленного места в рейтинге —
+    // раньше сюда молча попадали ранги первого предмета.
+    ranks: null,
   };
 }
 

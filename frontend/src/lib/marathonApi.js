@@ -82,14 +82,6 @@ export async function setPenaltyOverride({ name, subject, level, group, teacher,
   return res.json();
 }
 
-export async function getStudentYear(name, from = '2025-09-01', to = '2026-05-31') {
-  return apiFetch('/api/student-year', { name, from, to });
-}
-
-export async function getGradesSummary({ periodFrom = '2025-09-01', periodTo = '2026-05-31' } = {}) {
-  return apiFetch('/api/grades-summary', { periodFrom, periodTo }, true);
-}
-
 export async function getStudentJournal(name, from = '2025-09-01', to = '2026-05-31') {
   return apiFetch('/api/student-journal', { name, from, to });
 }
