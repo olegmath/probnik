@@ -7,6 +7,7 @@ import {
   buildProbnikDynamics,
   buildAttendance,
   buildStudentGroupMap,
+  groupsForStudent,
   filterCollected,
 } from '../../../lib/probnikTeacherStats.js';
 import { Sel, pill } from '../_helpers.jsx';
@@ -86,7 +87,7 @@ export default function ProbniksTab() {
     const scopedF = teacherKey ? (collectedRaw.finals || []).filter((f) => f.teacherKey === teacherKey) : (collectedRaw.finals || []);
     const set = new Set();
     for (const r of [...scopedA, ...scopedF]) {
-      for (const g of groupMap.get(r.searchName) || []) set.add(g);
+      for (const g of groupsForStudent(groupMap, r.searchName)) set.add(g);
     }
     return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
   }, [collectedRaw, teacherKey, groupMap]);
@@ -95,8 +96,8 @@ export default function ProbniksTab() {
   const collected = useMemo(() => {
     if (!collectedRaw || !groupSel) return collectedRaw;
     const names = new Set();
-    for (const [name, groups] of groupMap) {
-      if (groups.includes(groupSel)) names.add(name);
+    for (const r of [...collectedRaw.attempts, ...(collectedRaw.finals || [])]) {
+      if (groupsForStudent(groupMap, r.searchName).includes(groupSel)) names.add(r.searchName);
     }
     return filterCollected(collectedRaw, names);
   }, [collectedRaw, groupSel, groupMap]);

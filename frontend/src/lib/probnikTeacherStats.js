@@ -4,7 +4,7 @@ import {
   getMaxScoreForTask,
   normalizeScoreCell,
 } from './probnikData.js';
-import { normalizePersonName } from './normalizeName.js';
+import { normalizePersonName, getStudentSearchNames } from './normalizeName.js';
 
 // Агрегаты пробников в разрезе предмет × преподаватель для админ-вкладки «Пробники».
 // Вход всюду — allStudents из ProbnikProvider (уже распарсен и дедуплицирован),
@@ -118,8 +118,23 @@ export function probnikSubjectToJournal(subjectName) {
   return { subject, level };
 }
 
-// Сшивка ученик → группы журнала по нормализованному имени (как gradeByName).
-// Возвращает Map searchName → [groupId], только для предмета/уровня текущего среза.
+// Канонические ключи имени для сшивки с журналом. Журнал пишет «Фамилия Имя Отчество»
+// и полные имена, пробник — «Имя Фамилия» и уменьшительные. Ключ: первые два слова
+// (отчество отпадает) → варианты порядка и алиасы имён (getStudentSearchNames) →
+// сортировка слов, чтобы порядок не имел значения.
+function nameJoinKeys(rawName) {
+  const first2 = normalizePersonName(String(rawName || ''))
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' ');
+  if (!first2) return [];
+  const keys = getStudentSearchNames(first2).map((v) => v.split(' ').sort().join(' '));
+  return [...new Set(keys)];
+}
+
+// Сшивка ученик → группы журнала. Возвращает Map каноничный-ключ → [groupId],
+// только для предмета/уровня текущего среза. Читать через groupsForStudent.
 export function buildStudentGroupMap(directoryRows, subjectName) {
   const { subject, level } = probnikSubjectToJournal(subjectName);
   const map = new Map();
@@ -127,13 +142,23 @@ export function buildStudentGroupMap(directoryRows, subjectName) {
   for (const row of directoryRows || []) {
     if (!row?.name || !row.group) continue;
     if (row.subject !== subject || row.level !== level) continue;
-    const key = normalizePersonName(row.name);
-    if (!map.has(key)) map.set(key, []);
-    const list = map.get(key);
-    if (!list.includes(row.group)) list.push(row.group);
+    for (const key of nameJoinKeys(row.name)) {
+      if (!map.has(key)) map.set(key, []);
+      const list = map.get(key);
+      if (!list.includes(row.group)) list.push(row.group);
+    }
   }
   for (const list of map.values()) list.sort((a, b) => a.localeCompare(b, 'ru'));
   return map;
+}
+
+// Группы ученика по его searchName из пробников (union по всем вариантам ключа).
+export function groupsForStudent(groupMap, searchName) {
+  const groups = new Set();
+  for (const key of nameJoinKeys(searchName)) {
+    for (const g of groupMap.get(key) || []) groups.add(g);
+  }
+  return [...groups].sort((a, b) => a.localeCompare(b, 'ru'));
 }
 
 // Срез collected по множеству учеников (фильтр группы): attempts/finals фильтруются,

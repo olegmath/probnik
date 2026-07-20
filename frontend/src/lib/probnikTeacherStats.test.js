@@ -10,6 +10,7 @@ import {
   buildStudentMatrix,
   probnikSubjectToJournal,
   buildStudentGroupMap,
+  groupsForStudent,
   filterCollected,
 } from './probnikTeacherStats.js';
 import { getMaxScoreForTask, isFinalExamSheet } from './probnikData.js';
@@ -386,13 +387,23 @@ describe('buildStudentGroupMap: сшивка ученик → группы жу�
     { name: 'Кузнецова Маша', subject: 'математика', level: 'ЕГЭ', group: 'мат11СБ1200Л' },
     { name: 'Смирнов Гриша', subject: 'математика', level: 'ОГЭ', group: 'мат9ПН1600Л' },
     { name: 'ОрлОв  ДИМА', subject: 'математика', level: 'ЕГЭ', group: 'мат11ВТПТ1600Л' },
+    // Журнальные реалии: ФИО с отчеством, порядок «Фамилия Имя», полное имя вместо уменьшительного.
+    { name: 'Барило Агата Денисовна', subject: 'математика', level: 'ЕГЭ', group: 'мат11СР1730Лиц' },
+    { name: 'Анисеня Татьяна', subject: 'математика', level: 'ЕГЭ', group: 'мат11СБ1200Л' },
   ];
   const map = buildStudentGroupMap(dir, 'математика ЕГЭ-ПРОФ');
 
   it('берёт только свой предмет и уровень, имя нормализуется', () => {
-    expect(map.get('пупкин вася')).toEqual(['мат11ВТПТ1600Л']); // без РЯ-группы
-    expect(map.get('орлов дима')).toEqual(['мат11ВТПТ1600Л']); // регистр и пробелы
-    expect(map.get('смирнов гриша')).toBeUndefined(); // ОГЭ ≠ ЕГЭ
+    expect(groupsForStudent(map, 'пупкин вася')).toEqual(['мат11ВТПТ1600Л']); // без РЯ-группы
+    expect(groupsForStudent(map, 'орлов дима')).toEqual(['мат11ВТПТ1600Л']); // регистр и пробелы
+    expect(groupsForStudent(map, 'смирнов гриша')).toEqual([]); // ОГЭ ≠ ЕГЭ
+  });
+
+  it('находит при отчестве, перестановке слов и алиасе имени', () => {
+    // пробник: «Агата Барило» (Имя Фамилия) ↔ журнал: «Барило Агата Денисовна» (ФИО)
+    expect(groupsForStudent(map, 'агата барило')).toEqual(['мат11СР1730Лиц']);
+    // пробник: «Анисеня Таня» ↔ журнал: «Анисеня Татьяна»
+    expect(groupsForStudent(map, 'анисеня таня')).toEqual(['мат11СБ1200Л']);
   });
 });
 

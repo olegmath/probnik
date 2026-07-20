@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { SortTh, Th, Td, sortRows } from '../_helpers.jsx';
 import { scoreColor } from '../_format.js';
-import { buildStudentMatrix } from '../../../lib/probnikTeacherStats.js';
+import { buildStudentMatrix, groupsForStudent } from '../../../lib/probnikTeacherStats.js';
 
 function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--black)', margin: '24px 0 10px' }}>{children}</div>;
@@ -39,7 +39,7 @@ export default function ProbniksStudentsTable({ collected, subjectName, teacherK
       studentId: r.studentId,
       studentName: r.studentName,
       teachersLabel: r.teachers.join(', '),
-      groupsLabel: (groupMap?.get(r.searchName) || []).join(', '),
+      groupsLabel: groupMap ? groupsForStudent(groupMap, r.searchName).join(', ') : '',
       perProbnik: r.perProbnik,
       writtenCount: r.writtenCount,
       avg: r[avgKey],
