@@ -9,7 +9,7 @@ import {
   buildTaskTeacherMatrix,
   buildStudentMatrix,
 } from './probnikTeacherStats.js';
-import { getMaxScoreForTask } from './probnikData.js';
+import { getMaxScoreForTask, isFinalExamSheet } from './probnikData.js';
 
 const SUBJ = 'математика ЕГЭ-ПРОФ';
 
@@ -364,6 +364,19 @@ describe('buildTaskTeacherMatrix', () => {
     expect(t1.byTeacher[ANNA].pct).toBe(67); // 4 из 6
     expect(t1.byTeacher[PETR].pct).toBe(67); // 2 из 3
     expect(t1.byTeacher[NOBODY].pct).toBe(0);
+  });
+});
+
+describe('isFinalExamSheet: маркер финала — отдельное слово ЭКЗ', () => {
+  it('распознаёт листы «<предмет> ЭКЗ»', () => {
+    expect(isFinalExamSheet('ИНФ ЕГЭ ЭКЗ')).toBe(true);
+    expect(isFinalExamSheet('Мат ПРОФ ЭКЗ')).toBe(true);
+    expect(isFinalExamSheet('инф егэ экз')).toBe(true);
+  });
+  it('пробники и листы без пометки — не финал', () => {
+    expect(isFinalExamSheet('ИНФ ЕГЭ 17.05')).toBe(false);
+    expect(isFinalExamSheet('ИНФ ЕГЭ')).toBe(false); // просто без даты — уже не финал
+    expect(isFinalExamSheet('ЭКЗАМЕН ИНФ')).toBe(false); // ЭКЗ только как отдельное слово
   });
 });
 

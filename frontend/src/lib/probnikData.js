@@ -248,6 +248,12 @@ function getProbnikDateFromSheetName(sheetName) {
   return year ? `${day}.${month}.${year}` : `${day}.${month}`;
 }
 
+// Финальный (реальный) экзамен: лист «<предмет> ЭКЗ» («ИНФ ЕГЭ ЭКЗ», «Мат ПРОФ ЭКЗ»).
+// «ЭКЗ» — отдельное слово: \b с кириллицей в JS не работает, поэтому границы руками.
+export function isFinalExamSheet(sheetName) {
+  return /(^|\s)ЭКЗ(\s|$)/i.test(String(sheetName || '').trim());
+}
+
 export function getDateSortValue(date) {
   const parts = date.split('.').map((p) => parseInt(p, 10));
   if (parts.length < 2 || parts.some((p) => !Number.isFinite(p))) return 0;
@@ -298,10 +304,10 @@ export async function loadSheetsData(gradeByName = {}) {
       else if (sheetName.includes('ФИЗ')) subjectName = 'физика ' + examType;
       else if (sheetName.includes('ИСТ')) subjectName = 'история ЕГЭ';
       if (!subjectName) continue;
-      // Лист без даты в имени — результаты реального экзамена (финал), не пробник:
+      // Лист «<предмет> ЭКЗ» — результаты реального экзамена (финал), не пробник:
       // в каталог и attempts не попадает, живёт отдельно в finalExams.
       const probnikDate = getProbnikDateFromSheetName(sheetName);
-      const isFinal = !probnikDate;
+      const isFinal = isFinalExamSheet(sheetName);
       if (!isFinal) {
         (probnikCatalog[subjectName] = probnikCatalog[subjectName] || []).push({
           date: probnikDate, sheetIndex,
