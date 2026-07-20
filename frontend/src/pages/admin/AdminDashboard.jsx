@@ -7,6 +7,7 @@ import TeachersTab from './tabs/TeachersTab.jsx';
 import DailyTab from './tabs/DailyTab.jsx';
 import GroupErrorsTab from './tabs/GroupErrorsTab.jsx';
 import GradesTab from './tabs/GradesTab.jsx';
+import ProbniksTab from './tabs/ProbniksTab.jsx';
 import ReportsTab from './tabs/ReportsTab.jsx';
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
   { id: 'teachers', label: 'Преподаватели' },
   { id: 'daily', label: 'По дням' },
   { id: 'grades', label: 'ДЗ / КР' },
+  { id: 'probniki', label: 'Пробники' },
   { id: 'group-errors', label: 'Ошибки групп' },
   { id: 'reports', label: 'Отчёты' },
 ];
@@ -204,6 +206,7 @@ export default function AdminDashboard() {
       {activeTab === 'teachers' && <TeachersTab rows={filteredRows} />}
       {activeTab === 'daily' && <DailyTab rows={filteredRows} />}
       {activeTab === 'grades' && <GradesTab />}
+      {activeTab === 'probniki' && <ProbniksTab />}
       {activeTab === 'group-errors' && <GroupErrorsTab allRows={rawRows} />}
       {activeTab === 'reports' && <ReportsTab allRows={rawRows} onLogout={handleLogout} />}
     </main>

@@ -150,7 +150,11 @@ export function getMaxScoreForTask(subjectName, taskNum, scoresData = {}) {
   let exam = '', subject = '';
   if (lower.includes('егэ')) exam = 'ЕГЭ';
   else if (lower.includes('огэ')) exam = 'ОГЭ';
-  if (lower.includes('матем')) subject = lower.includes('проф') ? 'Математика профиль' : 'Математика';
+  if (lower.includes('матем')) {
+    if (lower.includes('проф')) subject = 'Математика профиль';
+    else if (lower.includes('баз')) subject = 'Математика база';
+    else subject = 'Математика';
+  }
   else if (lower.includes('русск')) subject = 'Русский язык';
   else if (lower.includes('физ')) subject = 'Физика';
   else if (lower.includes('инф')) subject = 'Информатика';
