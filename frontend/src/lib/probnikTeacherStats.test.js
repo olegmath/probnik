@@ -320,10 +320,10 @@ describe('buildStudentMatrix', () => {
     expect(vasya.perProbnik.map((p) => p?.secondaryScore ?? null)).toEqual([50, 60, 70]);
     expect(vasya.avgSecondary).toBe(60);
     expect(vasya.final.secondaryScore).toBe(72);
-    expect(vasya.deltaSecondary).toBe(2); // 72 − 70 (последний написанный пробник)
+    expect(vasya.deltaSecondary).toBe(12); // 72 − 60 (средний по пробникам)
     const grisha = rows.find((r) => r.studentId === 'гриша|ЕГЭ|11');
     expect(grisha.perProbnik.map((p) => p?.secondaryScore ?? null)).toEqual([30, null, 80]);
-    expect(grisha.deltaSecondary).toBe(5); // 85 − 80
+    expect(grisha.deltaSecondary).toBe(30); // 85 − 55
     expect(grisha.teachers).toContain('Анна Иванова');
     expect(grisha.teachers).toContain('Пётр Сидоров');
   });

@@ -220,18 +220,20 @@ export function buildStudentMatrix(collected, teacherKey = null) {
         };
       });
       const written = perProbnik.filter(Boolean);
-      const lastWritten = [...perProbnik].reverse().find(Boolean) || null;
+      const avgSecondary = written.length ? round1(mean(written.map((p) => p.secondaryScore))) : null;
+      const avgPrimary = written.length ? round1(mean(written.map((p) => p.primaryScore))) : null;
       return {
         studentId: s.studentId,
         studentName: s.studentName,
         teachers: [...s.teacherLabels].sort((a, b) => a.localeCompare(b, 'ru')),
         perProbnik,
         writtenCount: written.length,
-        avgSecondary: written.length ? round1(mean(written.map((p) => p.secondaryScore))) : null,
-        avgPrimary: written.length ? round1(mean(written.map((p) => p.primaryScore))) : null,
+        avgSecondary,
+        avgPrimary,
         final: s.final ? { primaryScore: s.final.primaryScore, secondaryScore: s.final.secondaryScore } : null,
-        deltaSecondary: s.final && lastWritten ? round1(s.final.secondaryScore - lastWritten.secondaryScore) : null,
-        deltaPrimary: s.final && lastWritten ? round1(s.final.primaryScore - lastWritten.primaryScore) : null,
+        // Δ — экзамен против среднего по пробникам (разница видимых в таблице колонок).
+        deltaSecondary: s.final && avgSecondary != null ? round1(s.final.secondaryScore - avgSecondary) : null,
+        deltaPrimary: s.final && avgPrimary != null ? round1(s.final.primaryScore - avgPrimary) : null,
       };
     })
     .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ru'));

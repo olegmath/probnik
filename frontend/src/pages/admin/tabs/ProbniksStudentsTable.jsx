@@ -55,7 +55,7 @@ export default function ProbniksStudentsTable({ collected, subjectName, teacherK
       <SectionTitle>Ученики</SectionTitle>
       <div style={{ fontSize: 11, color: 'var(--gray)', fontWeight: 600, marginBottom: 8 }}>
         Все пробники ученика по предмету{teacherKey ? ' (строки — ученики выбранного преподавателя, включая их попытки у других)' : ''}.
-        {hasFinals ? ' «Экзамен» — реальный результат; Δ — экзамен минус последний написанный пробник.' : ' Колонка «Экзамен» появится, когда будет заполнен финальный лист («<предмет> экз», например «ИНФ ЕГЭ экз»).'}
+        {hasFinals ? ' «Экзамен» — реальный результат; Δ — экзамен минус средний балл по пробникам.' : ' Колонка «Экзамен» появится, когда будет заполнен финальный лист («<предмет> экз», например «ИНФ ЕГЭ экз»).'}
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
