@@ -8,6 +8,9 @@ import {
   buildTaskSolvability,
   buildTaskTeacherMatrix,
   buildStudentMatrix,
+  probnikSubjectToJournal,
+  buildStudentGroupMap,
+  filterCollected,
 } from './probnikTeacherStats.js';
 import { getMaxScoreForTask, isFinalExamSheet } from './probnikData.js';
 
@@ -364,6 +367,56 @@ describe('buildTaskTeacherMatrix', () => {
     expect(t1.byTeacher[ANNA].pct).toBe(67); // 4 из 6
     expect(t1.byTeacher[PETR].pct).toBe(67); // 2 из 3
     expect(t1.byTeacher[NOBODY].pct).toBe(0);
+  });
+});
+
+describe('probnikSubjectToJournal: мэппинг предмета пробника на журнальный', () => {
+  it('уровень и предмет', () => {
+    expect(probnikSubjectToJournal('математика ЕГЭ-ПРОФ')).toEqual({ subject: 'математика', level: 'ЕГЭ' });
+    expect(probnikSubjectToJournal('математика ЕГЭ (база)')).toEqual({ subject: 'математика', level: 'ЕГЭ' });
+    expect(probnikSubjectToJournal('русский язык ОГЭ')).toEqual({ subject: 'русский язык', level: 'ОГЭ' });
+    expect(probnikSubjectToJournal('история ЕГЭ')).toEqual({ subject: 'история', level: 'ЕГЭ' });
+  });
+});
+
+describe('buildStudentGroupMap: сшивка ученик → группы журнала', () => {
+  const dir = [
+    { name: 'Пупкин Вася', subject: 'математика', level: 'ЕГЭ', group: 'мат11ВТПТ1600Л' },
+    { name: 'Пупкин Вася', subject: 'русский язык', level: 'ЕГЭ', group: 'ря11СБ' },
+    { name: 'Кузнецова Маша', subject: 'математика', level: 'ЕГЭ', group: 'мат11СБ1200Л' },
+    { name: 'Смирнов Гриша', subject: 'математика', level: 'ОГЭ', group: 'мат9ПН1600Л' },
+    { name: 'ОрлОв  ДИМА', subject: 'математика', level: 'ЕГЭ', group: 'мат11ВТПТ1600Л' },
+  ];
+  const map = buildStudentGroupMap(dir, 'математика ЕГЭ-ПРОФ');
+
+  it('берёт только свой предмет и уровень, имя нормализуется', () => {
+    expect(map.get('пупкин вася')).toEqual(['мат11ВТПТ1600Л']); // без РЯ-группы
+    expect(map.get('орлов дима')).toEqual(['мат11ВТПТ1600Л']); // регистр и пробелы
+    expect(map.get('смирнов гриша')).toBeUndefined(); // ОГЭ ≠ ЕГЭ
+  });
+});
+
+describe('filterCollected: срез по множеству учеников (фильтр группы)', () => {
+  const collected = collectSubjectAttempts(FIXTURE, SUBJ);
+  const view = filterCollected(collected, new Set(['пупкин вася', 'кузнецова маша']));
+
+  it('фильтрует attempts и finals, ось пробников не трогает', () => {
+    expect(view.attempts).toHaveLength(5); // Вася 3 + Маша 2
+    expect(view.finals).toHaveLength(1); // финал Васи
+    expect(view.probniks).toHaveLength(3);
+  });
+
+  it('пересчитывает преподавателей: пустые выпадают', () => {
+    expect(view.teachers.map((t) => t.key)).toEqual([ANNA]);
+    const anna = view.teachers[0];
+    expect(anna.students).toBe(2);
+    expect(anna.attempts).toBe(5);
+  });
+
+  it('записи несут searchName для сшивки с журналом', () => {
+    expect(collected.attempts.every((a) => typeof a.searchName === 'string' && a.searchName)).toBe(true);
+    const rows = buildStudentMatrix(collected);
+    expect(rows.find((r) => r.studentId === 'вася|ЕГЭ|11').searchName).toBe('пупкин вася');
   });
 });
 

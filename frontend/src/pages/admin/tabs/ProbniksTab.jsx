@@ -6,6 +6,8 @@ import {
   buildTeacherComparison,
   buildProbnikDynamics,
   buildAttendance,
+  buildStudentGroupMap,
+  filterCollected,
 } from '../../../lib/probnikTeacherStats.js';
 import { Sel, pill } from '../_helpers.jsx';
 import { scoreColor, fmtPct } from '../_format.js';
@@ -37,12 +39,13 @@ function SectionTitle({ children }) {
 }
 
 export default function ProbniksTab() {
-  const { allStudents, scoresData, taskThemes, loading } = useProbnik();
+  const { allStudents, scoresData, taskThemes, journalDirectory = [], loading } = useProbnik();
 
   // subjectChoice ''/metricChoice null = «не выбран», эффективное значение выводится
   // из данных — без setState в эффекте.
   const [subjectChoice, setSubjectChoice] = useState('');
   const [teacherKey, setTeacherKey] = useState('');
+  const [groupSel, setGroupSel] = useState('');
   const [metricChoice, setMetricChoice] = useState(null);
   const [visibleKeys, setVisibleKeys] = useState(null); // null = дефолт (все или топ-6)
 
@@ -62,14 +65,41 @@ export default function ProbniksTab() {
   const changeSubject = (name) => {
     setSubjectChoice(name);
     setTeacherKey('');
+    setGroupSel('');
     setVisibleKeys(null);
     setMetricChoice(null);
   };
 
-  const collected = useMemo(
+  const collectedRaw = useMemo(
     () => (subject ? collectSubjectAttempts(allStudents, subject) : null),
     [allStudents, subject]
   );
+
+  // Группы из журнального справочника: сшивка по имени, каскад после преподавателя.
+  const groupMap = useMemo(
+    () => buildStudentGroupMap(journalDirectory, subject),
+    [journalDirectory, subject]
+  );
+  const groupOptions = useMemo(() => {
+    if (!collectedRaw) return [];
+    const scopedA = teacherKey ? collectedRaw.attempts.filter((a) => a.teacherKey === teacherKey) : collectedRaw.attempts;
+    const scopedF = teacherKey ? (collectedRaw.finals || []).filter((f) => f.teacherKey === teacherKey) : (collectedRaw.finals || []);
+    const set = new Set();
+    for (const r of [...scopedA, ...scopedF]) {
+      for (const g of groupMap.get(r.searchName) || []) set.add(g);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [collectedRaw, teacherKey, groupMap]);
+
+  // Срез по выбранной группе — от него живёт ВСЯ вкладка (карточки, график, таблицы).
+  const collected = useMemo(() => {
+    if (!collectedRaw || !groupSel) return collectedRaw;
+    const names = new Set();
+    for (const [name, groups] of groupMap) {
+      if (groups.includes(groupSel)) names.add(name);
+    }
+    return filterCollected(collectedRaw, names);
+  }, [collectedRaw, groupSel, groupMap]);
   const comparison = useMemo(() => (collected ? buildTeacherComparison(collected) : []), [collected]);
   const dynamics = useMemo(
     () => (collected ? buildProbnikDynamics(collected, teacherKey || null) : null),
@@ -109,11 +139,12 @@ export default function ProbniksTab() {
     };
   }, [collected, scopeAttempts, metric, teacherKey, attendance]);
 
+  // Цвета — от полного списка преподавателей, чтобы не прыгали при фильтре группы.
   const teacherColor = useMemo(() => {
     const map = {};
-    (collected?.teachers || []).forEach((t, i) => { map[t.key] = PALETTE[i % PALETTE.length]; });
+    (collectedRaw?.teachers || []).forEach((t, i) => { map[t.key] = PALETTE[i % PALETTE.length]; });
     return map;
-  }, [collected]);
+  }, [collectedRaw]);
 
   // Идентичность Set не важна (используется только .has) — без useMemo,
   // React Compiler мемоизирует сам.
@@ -164,8 +195,8 @@ export default function ProbniksTab() {
   }
   if (!collected || !summary) return null;
 
-  const teacherOptions = collected.teachers.map((t) => t.label);
-  const selectedTeacherLabel = collected.teachers.find((t) => t.key === teacherKey)?.label || '';
+  const teacherOptions = collectedRaw.teachers.map((t) => t.label);
+  const selectedTeacherLabel = collectedRaw.teachers.find((t) => t.key === teacherKey)?.label || '';
   const cohort = dynamics?.cohort;
   const metricNote = metric === 'primary'
     ? `первичный балл, макс ${metricMax}`
@@ -178,10 +209,16 @@ export default function ProbniksTab() {
         <Sel
           label="Преподаватель"
           value={selectedTeacherLabel}
-          onChange={(label) => setTeacherKey(collected.teachers.find((t) => t.label === label)?.key || '')}
+          onChange={(label) => {
+            setTeacherKey(collectedRaw.teachers.find((t) => t.label === label)?.key || '');
+            setGroupSel('');
+          }}
           options={teacherOptions}
           placeholder="Все преподаватели"
         />
+        {groupOptions.length > 0 && (
+          <Sel label="Группа" value={groupSel} onChange={setGroupSel} options={groupOptions} placeholder="Все группы" />
+        )}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingBottom: 4 }}>
           {pill(isGradeScale(subject) ? 'Оценка (2–5)' : 'Вторичный (/100)', metric === 'secondary', () => setMetricChoice('secondary'), 'var(--blue)')}
           {pill(`Первичный (/${getMaxScore(subject)})`, metric === 'primary', () => setMetricChoice('primary'), 'var(--blue)')}
@@ -189,7 +226,7 @@ export default function ProbniksTab() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, margin: '14px 0 4px' }}>
-        <SummaryCard label="Учеников" value={summary.students} note={teacherKey ? selectedTeacherLabel : 'по предмету'} />
+        <SummaryCard label="Учеников" value={summary.students} note={groupSel || (teacherKey ? selectedTeacherLabel : 'по предмету')} />
         <SummaryCard label="Попыток" value={summary.attempts} />
         <SummaryCard label="Пробников" value={summary.probniks} />
         <SummaryCard label="Ср. балл" value={summary.avg ?? '—'} color={scoreColor(normPct(summary.avg))} note={metricNote} />
@@ -238,6 +275,7 @@ export default function ProbniksTab() {
         teacherKey={teacherKey}
         metric={metric}
         metricMax={metricMax}
+        groupMap={groupMap}
       />
 
       <ProbniksTasks

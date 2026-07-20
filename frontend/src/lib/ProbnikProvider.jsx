@@ -58,6 +58,7 @@ export function ProbnikProvider({ children }) {
     scoresData: {},
     taskThemes: {},
     probnikCatalog: {},
+    journalDirectory: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -101,6 +102,8 @@ export function ProbnikProvider({ children }) {
             taskThemes,
             allStudents,
             probnikCatalog: catalog,
+            // Сырые строки /api/students: сшивка ученик → группа в админ-вкладке «Пробники».
+            journalDirectory: directoryRows,
           };
         });
       })

@@ -20,7 +20,7 @@ function DeltaCell({ value }) {
 }
 
 // Поимённая таблица: строка — ученик, колонки — все пробники + реальный экзамен.
-export default function ProbniksStudentsTable({ collected, subjectName, teacherKey, metric, metricMax }) {
+export default function ProbniksStudentsTable({ collected, subjectName, teacherKey, metric, metricMax, groupMap }) {
   const [sortKey, setSortKey] = useState('studentName');
   const [sortDir, setSortDir] = useState('asc');
 
@@ -39,6 +39,7 @@ export default function ProbniksStudentsTable({ collected, subjectName, teacherK
       studentId: r.studentId,
       studentName: r.studentName,
       teachersLabel: r.teachers.join(', '),
+      groupsLabel: (groupMap?.get(r.searchName) || []).join(', '),
       perProbnik: r.perProbnik,
       writtenCount: r.writtenCount,
       avg: r[avgKey],
@@ -46,7 +47,7 @@ export default function ProbniksStudentsTable({ collected, subjectName, teacherK
       delta: r[deltaKey],
     }));
     return sortRows(flat, sortKey === 'studentName' ? 'studentName' : sortKey, sortDir);
-  }, [collected, teacherKey, avgKey, mk, deltaKey, sortKey, sortDir]);
+  }, [collected, teacherKey, groupMap, avgKey, mk, deltaKey, sortKey, sortDir]);
 
   const hasFinals = (collected.finals || []).length > 0;
 
@@ -62,6 +63,7 @@ export default function ProbniksStudentsTable({ collected, subjectName, teacherK
           <thead>
             <tr>
               <SortTh sortKey="studentName" currentKey={sortKey} currentDir={sortDir} onSort={onSort}>Ученик</SortTh>
+              <SortTh sortKey="groupsLabel" currentKey={sortKey} currentDir={sortDir} onSort={onSort}>Группа</SortTh>
               <Th>Преподаватель</Th>
               {collected.probniks.map((p) => <Th key={p.sheetIndex} right>{p.label}</Th>)}
               <SortTh sortKey="writtenCount" currentKey={sortKey} currentDir={sortDir} onSort={onSort} right>Написал</SortTh>
@@ -80,6 +82,11 @@ export default function ProbniksStudentsTable({ collected, subjectName, teacherK
                   >
                     {r.studentName}
                   </Link>
+                </Td>
+                <Td title={r.groupsLabel}>
+                  <span style={{ display: 'inline-block', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', color: 'var(--gray)', fontWeight: 600 }}>
+                    {r.groupsLabel || '—'}
+                  </span>
                 </Td>
                 <Td title={r.teachersLabel}>
                   <span style={{ display: 'inline-block', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom', color: 'var(--gray)', fontWeight: 600 }}>

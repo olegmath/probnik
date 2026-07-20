@@ -4,6 +4,7 @@ import {
   getMaxScoreForTask,
   normalizeScoreCell,
 } from './probnikData.js';
+import { normalizePersonName } from './normalizeName.js';
 
 // Агрегаты пробников в разрезе предмет × преподаватель для админ-вкладки «Пробники».
 // Вход всюду — allStudents из ProbnikProvider (уже распарсен и дедуплицирован),
@@ -42,6 +43,7 @@ export function collectSubjectAttempts(allStudents, subjectName) {
       finals.push({
         studentId: stu.id,
         studentName: stu.name,
+        searchName: stu.searchName,
         teacherKey: normalizeTeacherKey(fin.teacher),
         primaryScore: fin.primaryScore,
         secondaryScore: fin.secondaryScore,
@@ -55,6 +57,7 @@ export function collectSubjectAttempts(allStudents, subjectName) {
         attempts.push({
           studentId: stu.id,
           studentName: stu.name,
+          searchName: stu.searchName,
           teacherKey,
           sheetIndex: a.sheetIndex,
           date: a.date,
@@ -99,6 +102,58 @@ export function collectSubjectAttempts(allStudents, subjectName) {
     .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
 
   return { subjectName, probniks, attempts, finals, teachers };
+}
+
+// Мэппинг предмета пробника на (subject, level) журнального справочника /api/students.
+export function probnikSubjectToJournal(subjectName) {
+  const lower = String(subjectName || '').toLowerCase();
+  const level = lower.includes('огэ') ? 'ОГЭ' : 'ЕГЭ';
+  let subject = '';
+  if (lower.includes('матем')) subject = 'математика';
+  else if (lower.includes('русск')) subject = 'русский язык';
+  else if (lower.includes('информ')) subject = 'информатика';
+  else if (lower.includes('физик')) subject = 'физика';
+  else if (lower.includes('обществ')) subject = 'обществознание';
+  else if (lower.includes('истор')) subject = 'история';
+  return { subject, level };
+}
+
+// Сшивка ученик → группы журнала по нормализованному имени (как gradeByName).
+// Возвращает Map searchName → [groupId], только для предмета/уровня текущего среза.
+export function buildStudentGroupMap(directoryRows, subjectName) {
+  const { subject, level } = probnikSubjectToJournal(subjectName);
+  const map = new Map();
+  if (!subject) return map;
+  for (const row of directoryRows || []) {
+    if (!row?.name || !row.group) continue;
+    if (row.subject !== subject || row.level !== level) continue;
+    const key = normalizePersonName(row.name);
+    if (!map.has(key)) map.set(key, []);
+    const list = map.get(key);
+    if (!list.includes(row.group)) list.push(row.group);
+  }
+  for (const list of map.values()) list.sort((a, b) => a.localeCompare(b, 'ru'));
+  return map;
+}
+
+// Срез collected по множеству учеников (фильтр группы): attempts/finals фильтруются,
+// счётчики преподавателей пересчитываются, ось пробников остаётся полной.
+export function filterCollected(collected, searchNameSet) {
+  const attempts = collected.attempts.filter((a) => searchNameSet.has(a.searchName));
+  const finals = (collected.finals || []).filter((f) => searchNameSet.has(f.searchName));
+  const teachers = collected.teachers
+    .map((t) => ({
+      t,
+      ta: attempts.filter((a) => a.teacherKey === t.key),
+      tfCount: finals.filter((f) => f.teacherKey === t.key).length,
+    }))
+    .filter(({ ta, tfCount }) => ta.length > 0 || tfCount > 0)
+    .map(({ t, ta }) => ({
+      ...t,
+      students: new Set(ta.map((a) => a.studentId)).size,
+      attempts: ta.length,
+    }));
+  return { ...collected, attempts, finals, teachers };
 }
 
 function scopeAttempts(collected, teacherKey) {
@@ -185,22 +240,22 @@ export function buildTeacherComparison(collected) {
 // предмету; фильтр преподавателя лишь отбирает строки (попытка или финал у него).
 export function buildStudentMatrix(collected, teacherKey = null) {
   const byStudent = new Map();
-  const ensure = (id, name) => {
+  const ensure = (id, name, searchName) => {
     if (!byStudent.has(id)) {
-      byStudent.set(id, { studentId: id, studentName: name, attempts: [], final: null, teacherKeys: new Set(), teacherLabels: new Set() });
+      byStudent.set(id, { studentId: id, studentName: name, searchName, attempts: [], final: null, teacherKeys: new Set(), teacherLabels: new Set() });
     }
     return byStudent.get(id);
   };
   const labelByKey = Object.fromEntries(collected.teachers.map((t) => [t.key, t.label]));
 
   for (const a of collected.attempts) {
-    const s = ensure(a.studentId, a.studentName);
+    const s = ensure(a.studentId, a.studentName, a.searchName);
     s.attempts.push(a);
     s.teacherKeys.add(a.teacherKey);
     s.teacherLabels.add(labelByKey[a.teacherKey] || a.teacherKey);
   }
   for (const f of collected.finals || []) {
-    const s = ensure(f.studentId, f.studentName);
+    const s = ensure(f.studentId, f.studentName, f.searchName);
     s.final = { primaryScore: f.primaryScore, secondaryScore: f.secondaryScore, teacherKey: f.teacherKey };
     s.teacherKeys.add(f.teacherKey);
     s.teacherLabels.add(labelByKey[f.teacherKey] || f.teacherKey);
@@ -225,6 +280,7 @@ export function buildStudentMatrix(collected, teacherKey = null) {
       return {
         studentId: s.studentId,
         studentName: s.studentName,
+        searchName: s.searchName,
         teachers: [...s.teacherLabels].sort((a, b) => a.localeCompare(b, 'ru')),
         perProbnik,
         writtenCount: written.length,
