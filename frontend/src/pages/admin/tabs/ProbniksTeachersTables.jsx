@@ -37,6 +37,7 @@ export default function ProbniksTeachersTables({
     else { setSortKey(key); setSortDir('desc'); }
   };
 
+  const finalKey = metricKey === 'avgSecondary' ? 'avgFinalSecondary' : 'avgFinalPrimary';
   const rows = useMemo(() => {
     const attByKey = Object.fromEntries(attendance.teachers.map((t) => [t.teacherKey, t]));
     const flat = comparison.map((r) => ({
@@ -45,12 +46,14 @@ export default function ProbniksTeachersTables({
       students: r.students,
       attempts: r.attempts,
       avgScore: r[metricKey],
+      avgFinal: r[finalKey],
+      finalCount: r.finalCount,
       attPct: attByKey[r.teacherKey]?.avgPct ?? null,
       points: r.points.map((p) => p[metricKey]),
       cohort: r.cohort,
     }));
     return sortRows(flat, sortKey, sortDir);
-  }, [comparison, attendance, metricKey, sortKey, sortDir]);
+  }, [comparison, attendance, metricKey, finalKey, sortKey, sortDir]);
 
   const attRows = teacherKey
     ? attendance.teachers.filter((t) => t.teacherKey === teacherKey)
@@ -68,6 +71,7 @@ export default function ProbniksTeachersTables({
               <SortTh sortKey="students" currentKey={sortKey} currentDir={sortDir} onSort={onSort} right>Учеников</SortTh>
               <SortTh sortKey="attempts" currentKey={sortKey} currentDir={sortDir} onSort={onSort} right>Попыток</SortTh>
               <SortTh sortKey="avgScore" currentKey={sortKey} currentDir={sortDir} onSort={onSort} right>Ср. балл</SortTh>
+              <SortTh sortKey="avgFinal" currentKey={sortKey} currentDir={sortDir} onSort={onSort} right>Ср. экзамен</SortTh>
               <SortTh sortKey="attPct" currentKey={sortKey} currentDir={sortDir} onSort={onSort} right>Посещ. ср.</SortTh>
               <Th>Динамика</Th>
               <Th right>Δ состава</Th>
@@ -85,6 +89,11 @@ export default function ProbniksTeachersTables({
                 <Td right mono>
                   <span style={{ color: scoreColor(r.avgScore == null ? null : (r.avgScore / metricMax) * 100), fontWeight: 900 }}>
                     {r.avgScore ?? '—'}
+                  </span>
+                </Td>
+                <Td right mono title={r.finalCount ? `${r.finalCount} сдавших` : 'нет данных финального экзамена'}>
+                  <span style={{ color: scoreColor(r.avgFinal == null ? null : (r.avgFinal / metricMax) * 100), fontWeight: 900 }}>
+                    {r.avgFinal ?? '—'}
                   </span>
                 </Td>
                 <Td right mono>

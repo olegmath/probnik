@@ -7,6 +7,7 @@ import {
   buildAttendance,
   buildTaskSolvability,
   buildTaskTeacherMatrix,
+  buildStudentMatrix,
 } from './probnikTeacherStats.js';
 import { getMaxScoreForTask } from './probnikData.js';
 
@@ -66,6 +67,23 @@ const FIXTURE = {
 };
 // у «пустого» subjects[0].attempts = [] — collectSubjectAttempts обязан его игнорировать
 FIXTURE['пустой|ЕГЭ|11'].subjects = [{ name: SUBJ, examType: 'ЕГЭ', attempts: [] }];
+
+// Финальный (реальный) ЕГЭ — отдельная структура, не участвует в оси пробников.
+FIXTURE['вася|ЕГЭ|11'].finalExams = {
+  [SUBJ]: { teacher: 'Анна Иванова', primaryScore: 15, secondaryScore: 72, taskScores: [1, 1, 2], sheetName: 'МАТ ПРОФ' },
+};
+FIXTURE['гриша|ЕГЭ|11'].finalExams = {
+  [SUBJ]: { teacher: 'Пётр Сидоров', primaryScore: 17, secondaryScore: 85, taskScores: [1, 1, 2], sheetName: 'МАТ ПРОФ' },
+};
+FIXTURE['оля|ЕГЭ|11'].finalExams = {
+  [SUBJ]: { teacher: 'Петр Сидоров', primaryScore: 12, secondaryScore: 60, taskScores: [1, 1, 0], sheetName: 'МАТ ПРОФ' },
+};
+// Соня: сдала реальный ЕГЭ, но не писала ни одного пробника.
+FIXTURE['соня|ЕГЭ|11'] = student('соня|ЕГЭ|11', 'Финалова Соня', []);
+FIXTURE['соня|ЕГЭ|11'].subjects = [{ name: SUBJ, examType: 'ЕГЭ', attempts: [] }];
+FIXTURE['соня|ЕГЭ|11'].finalExams = {
+  [SUBJ]: { teacher: 'Анна Иванова', primaryScore: 10, secondaryScore: 50, taskScores: [1, 0, 1], sheetName: 'МАТ ПРОФ' },
+};
 
 const ANNA = normalizeTeacherKey('Анна Иванова');
 const PETR = normalizeTeacherKey('Пётр Сидоров');
@@ -258,6 +276,83 @@ describe('buildTaskSolvability', () => {
     expect(rows[26].pct).toBe(50); // 11 из 22
     expect(rows[27].label).toBe('К1');
     expect(rows[36].label).toBe('К10');
+  });
+});
+
+describe('финальный ЕГЭ в collectSubjectAttempts', () => {
+  const collected = collectSubjectAttempts(FIXTURE, SUBJ);
+
+  it('finals собираются отдельно от attempts и не попадают в ось пробников', () => {
+    expect(collected.finals).toHaveLength(4); // Вася, Гриша, Оля, Соня
+    expect(collected.attempts).toHaveLength(12); // финал не добавил попыток
+    expect(collected.probniks.map((p) => p.sheetIndex)).toEqual([0, 5, 9]); // ось не выросла
+  });
+
+  it('преподаватель финала нормализуется', () => {
+    const olya = collected.finals.find((f) => f.studentId === 'оля|ЕГЭ|11');
+    expect(olya.teacherKey).toBe(PETR); // в листе было «Петр» без ё
+  });
+});
+
+describe('buildTeacherComparison: средний финальный ЕГЭ', () => {
+  const rows = buildTeacherComparison(collectSubjectAttempts(FIXTURE, SUBJ));
+  const anna = rows.find((r) => r.teacherKey === ANNA);
+  const petr = rows.find((r) => r.teacherKey === PETR);
+  const nobody = rows.find((r) => r.teacherKey === NOBODY);
+
+  it('avgFinal по ученикам преподавателя из финального листа', () => {
+    expect(anna.finalCount).toBe(2); // Вася 72 + Соня 50
+    expect(anna.avgFinalSecondary).toBe(61);
+    expect(petr.finalCount).toBe(2); // Гриша 85 + Оля 60
+    expect(petr.avgFinalSecondary).toBe(72.5);
+    expect(nobody.finalCount).toBe(0);
+    expect(nobody.avgFinalSecondary).toBeNull();
+  });
+});
+
+describe('buildStudentMatrix', () => {
+  const collected = collectSubjectAttempts(FIXTURE, SUBJ);
+
+  it('строка на ученика: все его пробники по оси + финал + дельта', () => {
+    const rows = buildStudentMatrix(collected);
+    expect(rows).toHaveLength(6); // 5 писавших + Соня (только финал)
+    const vasya = rows.find((r) => r.studentId === 'вася|ЕГЭ|11');
+    expect(vasya.perProbnik.map((p) => p?.secondaryScore ?? null)).toEqual([50, 60, 70]);
+    expect(vasya.avgSecondary).toBe(60);
+    expect(vasya.final.secondaryScore).toBe(72);
+    expect(vasya.deltaSecondary).toBe(2); // 72 − 70 (последний написанный пробник)
+    const grisha = rows.find((r) => r.studentId === 'гриша|ЕГЭ|11');
+    expect(grisha.perProbnik.map((p) => p?.secondaryScore ?? null)).toEqual([30, null, 80]);
+    expect(grisha.deltaSecondary).toBe(5); // 85 − 80
+    expect(grisha.teachers).toContain('Анна Иванова');
+    expect(grisha.teachers).toContain('Пётр Сидоров');
+  });
+
+  it('без финала — final и дельта null; финал без пробников — пустая строка с ЕГЭ', () => {
+    const rows = buildStudentMatrix(collected);
+    const dima = rows.find((r) => r.studentId === 'дима|ЕГЭ|11');
+    expect(dima.final).toBeNull();
+    expect(dima.deltaSecondary).toBeNull();
+    const sonya = rows.find((r) => r.studentId === 'соня|ЕГЭ|11');
+    expect(sonya.perProbnik.every((p) => p === null)).toBe(true);
+    expect(sonya.avgSecondary).toBeNull();
+    expect(sonya.final.secondaryScore).toBe(50);
+    expect(sonya.deltaSecondary).toBeNull();
+  });
+
+  it('фильтр преподавателя отбирает строки, но показывает все попытки ученика', () => {
+    const rows = buildStudentMatrix(collected, ANNA);
+    expect(rows.map((r) => r.studentId).sort()).toEqual(
+      ['вася|ЕГЭ|11', 'гриша|ЕГЭ|11', 'маша|ЕГЭ|11', 'соня|ЕГЭ|11'].sort()
+    ); // Соня — по финалу у Анны; Оля и Дима не у Анны
+    const grisha = rows.find((r) => r.studentId === 'гриша|ЕГЭ|11');
+    expect(grisha.perProbnik.map((p) => p?.secondaryScore ?? null)).toEqual([30, null, 80]); // включая попытку у Петра
+  });
+
+  it('сортировка по имени, ru', () => {
+    const rows = buildStudentMatrix(collected);
+    expect(rows[0].studentName).toBe('Иванова Оля');
+    expect(rows[rows.length - 1].studentName).toBe('Финалова Соня');
   });
 });
 

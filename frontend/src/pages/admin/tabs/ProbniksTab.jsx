@@ -11,6 +11,7 @@ import { Sel, pill } from '../_helpers.jsx';
 import { scoreColor, fmtPct } from '../_format.js';
 import MultiLine from '../../../components/charts/MultiLine.jsx';
 import ProbniksTeachersTables from './ProbniksTeachersTables.jsx';
+import ProbniksStudentsTable from './ProbniksStudentsTable.jsx';
 import ProbniksTasks from './ProbniksTasks.jsx';
 
 const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#f5a623', '#7c3aed', '#0d9488', '#e05454', '#b45309', '#0284c7', '#6b7280'];
@@ -94,7 +95,18 @@ export default function ProbniksTab() {
     const attRow = teacherKey
       ? attendance.teachers.find((t) => t.teacherKey === teacherKey)
       : attendance.overall;
-    return { students, attempts: scopeAttempts.length, probniks: collected.probniks.length, avg, attPct: attRow?.avgPct ?? null };
+    const scopeFinals = teacherKey
+      ? (collected.finals || []).filter((f) => f.teacherKey === teacherKey)
+      : (collected.finals || []);
+    const finalScores = scopeFinals.map((f) => (metric === 'secondary' ? f.secondaryScore : f.primaryScore));
+    const avgFinal = finalScores.length
+      ? Math.round((finalScores.reduce((s, v) => s + v, 0) / finalScores.length) * 10) / 10
+      : null;
+    return {
+      students, attempts: scopeAttempts.length, probniks: collected.probniks.length, avg,
+      attPct: attRow?.avgPct ?? null,
+      avgFinal, finalCount: scopeFinals.length,
+    };
   }, [collected, scopeAttempts, metric, teacherKey, attendance]);
 
   const teacherColor = useMemo(() => {
@@ -183,6 +195,12 @@ export default function ProbniksTab() {
         <SummaryCard label="Ср. балл" value={summary.avg ?? '—'} color={scoreColor(normPct(summary.avg))} note={metricNote} />
         <SummaryCard label="Посещаемость ср." value={fmtPct(summary.attPct, 0)} color={scoreColor(summary.attPct)} note="от писавших за год" />
         <SummaryCard
+          label="Экзамен ср."
+          value={summary.avgFinal ?? '—'}
+          color={summary.avgFinal != null ? scoreColor(normPct(summary.avgFinal)) : 'var(--gray)'}
+          note={summary.finalCount ? `${summary.finalCount} сдавших` : 'финальный лист пуст'}
+        />
+        <SummaryCard
           label="Прогресс состава"
           value={cohort ? `${cohort[deltaKey] > 0 ? '+' : ''}${cohort[deltaKey]}` : '—'}
           color={cohort ? (cohort[deltaKey] > 0 ? '#34b87a' : cohort[deltaKey] < 0 ? '#e05454' : 'var(--black)') : 'var(--gray)'}
@@ -212,6 +230,14 @@ export default function ProbniksTab() {
         metricMax={metricMax}
         teacherKey={teacherKey}
         teacherColor={teacherColor}
+      />
+
+      <ProbniksStudentsTable
+        collected={collected}
+        subjectName={subject}
+        teacherKey={teacherKey}
+        metric={metric}
+        metricMax={metricMax}
       />
 
       <ProbniksTasks

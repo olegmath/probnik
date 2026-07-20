@@ -298,9 +298,15 @@ export async function loadSheetsData(gradeByName = {}) {
       else if (sheetName.includes('ФИЗ')) subjectName = 'физика ' + examType;
       else if (sheetName.includes('ИСТ')) subjectName = 'история ЕГЭ';
       if (!subjectName) continue;
-      (probnikCatalog[subjectName] = probnikCatalog[subjectName] || []).push({
-        date: getProbnikDateFromSheetName(sheetName), sheetIndex,
-      });
+      // Лист без даты в имени — результаты реального экзамена (финал), не пробник:
+      // в каталог и attempts не попадает, живёт отдельно в finalExams.
+      const probnikDate = getProbnikDateFromSheetName(sheetName);
+      const isFinal = !probnikDate;
+      if (!isFinal) {
+        (probnikCatalog[subjectName] = probnikCatalog[subjectName] || []).push({
+          date: probnikDate, sheetIndex,
+        });
+      }
 
       const numTasks = getTaskCount(subjectName);
       for (let i = 2; i < rows.length; i++) {
@@ -321,12 +327,17 @@ export async function loadSheetsData(gradeByName = {}) {
             examType, subjects: {},
           };
         }
+        if (isFinal) {
+          allStudents[key].finalExams = allStudents[key].finalExams || {};
+          allStudents[key].finalExams[subjectName] = { teacher, primaryScore, secondaryScore, taskScores, sheetName };
+          continue;
+        }
         if (!allStudents[key].subjects[subjectName]) {
           allStudents[key].subjects[subjectName] = { name: subjectName, examType, attempts: [] };
         }
         allStudents[key].subjects[subjectName].attempts.push({
           name: subjectName, examType, teacher, primaryScore, secondaryScore, taskScores,
-          date: getProbnikDateFromSheetName(sheetName), sheetName, sheetIndex,
+          date: probnikDate, sheetName, sheetIndex,
         });
       }
     }
@@ -348,7 +359,8 @@ export async function loadSheetsData(gradeByName = {}) {
         const egeEquivalent = ogeSubjName.replace(' ОГЭ', ' ЕГЭ');
         if (egeSubjects[egeEquivalent]) delete ogeSubjects[ogeSubjName];
       }
-      if (Object.keys(ogeSubjects).length === 0) delete allStudents[ogeKey];
+      const ogeFinals = Object.keys(allStudents[ogeKey].finalExams || {}).length;
+      if (Object.keys(ogeSubjects).length === 0 && ogeFinals === 0) delete allStudents[ogeKey];
     }
 
     // Каталог → список дат пробников по предмету, новые сверху (как attempts).
@@ -396,8 +408,18 @@ function processStudentData(allStudents, gradeByName = {}) {
         })),
       });
     }
-    if (subjects.length > 0) {
-      const examType = subjects[0].examType;
+    const finalExams = {};
+    for (const [subjName, fin] of Object.entries(student.finalExams || {})) {
+      finalExams[subjName] = {
+        ...fin,
+        primaryScore: parseInt(fin.primaryScore) || 0,
+        secondaryScore: parseInt(fin.secondaryScore) || 0,
+      };
+    }
+    const hasFinals = Object.keys(finalExams).length > 0;
+    // Ученик с одним лишь финальным экзаменом (ни одного пробника) тоже сохраняется.
+    if (subjects.length > 0 || hasFinals) {
+      const examType = subjects[0]?.examType || student.examType;
       // Класс — источник истины marathon (gradeByName по имени); для probnik-only fallback из examType.
       const grade = resolveGrade(gradeByName[student.searchName], examType);
       const id = `${student.searchName}|${examType}|${grade}`;
@@ -406,6 +428,7 @@ function processStudentData(allStudents, gradeByName = {}) {
         searchKey: student.searchKey, searchKeys: student.searchKeys,
         id,
         examType, grade, subjects,
+        ...(hasFinals ? { finalExams } : {}),
       };
     }
   }

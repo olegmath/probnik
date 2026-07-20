@@ -28,12 +28,26 @@ function roundPct(part, total) { return total === 0 ? 0 : Math.round((part / tot
 function mean(values) { return values.length === 0 ? null : values.reduce((s, v) => s + v, 0) / values.length; }
 
 // Плоский срез попыток по предмету + ось пробников + справочник преподавателей.
+// finals — результаты реального экзамена (листы без даты): отдельно от attempts,
+// в ось пробников, динамику и посещаемость не входят.
 export function collectSubjectAttempts(allStudents, subjectName) {
   const attempts = [];
+  const finals = [];
   const probnikByIndex = new Map();
   const teacherMap = new Map(); // key → { variants: Map<label, count>, studentIds: Set, attempts }
 
   for (const stu of Object.values(allStudents || {})) {
+    const fin = stu.finalExams?.[subjectName];
+    if (fin) {
+      finals.push({
+        studentId: stu.id,
+        studentName: stu.name,
+        teacherKey: normalizeTeacherKey(fin.teacher),
+        primaryScore: fin.primaryScore,
+        secondaryScore: fin.secondaryScore,
+        taskScores: fin.taskScores || [],
+      });
+    }
     for (const subj of stu.subjects || []) {
       if (subj.name !== subjectName) continue;
       for (const a of subj.attempts || []) {
@@ -84,7 +98,7 @@ export function collectSubjectAttempts(allStudents, subjectName) {
     })
     .sort((a, b) => a.label.localeCompare(b.label, 'ru'));
 
-  return { subjectName, probniks, attempts, teachers };
+  return { subjectName, probniks, attempts, finals, teachers };
 }
 
 function scopeAttempts(collected, teacherKey) {
@@ -144,10 +158,12 @@ function buildCohort(collected, attempts) {
 }
 
 // Сравнение преподавателей: строка на преподавателя, points выровнены по оси probniks.
+// avgFinal* — средний результат реального экзамена по ученикам преподавателя.
 export function buildTeacherComparison(collected) {
   return collected.teachers.map((t) => {
     const attempts = scopeAttempts(collected, t.key);
     const studentIds = [...new Set(attempts.map((a) => a.studentId))];
+    const finals = (collected.finals || []).filter((f) => f.teacherKey === t.key);
     return {
       teacherKey: t.key,
       teacher: t.label,
@@ -156,10 +172,69 @@ export function buildTeacherComparison(collected) {
       attempts: attempts.length,
       avgSecondary: round1(mean(attempts.map((a) => a.secondaryScore))),
       avgPrimary: round1(mean(attempts.map((a) => a.primaryScore))),
+      finalCount: finals.length,
+      avgFinalSecondary: finals.length ? round1(mean(finals.map((f) => f.secondaryScore))) : null,
+      avgFinalPrimary: finals.length ? round1(mean(finals.map((f) => f.primaryScore))) : null,
       points: buildPoints(collected, attempts),
       cohort: buildCohort(collected, attempts),
     };
   });
+}
+
+// Поимённая матрица «ученик × пробники»: строка содержит ВСЕ попытки ученика по
+// предмету; фильтр преподавателя лишь отбирает строки (попытка или финал у него).
+export function buildStudentMatrix(collected, teacherKey = null) {
+  const byStudent = new Map();
+  const ensure = (id, name) => {
+    if (!byStudent.has(id)) {
+      byStudent.set(id, { studentId: id, studentName: name, attempts: [], final: null, teacherKeys: new Set(), teacherLabels: new Set() });
+    }
+    return byStudent.get(id);
+  };
+  const labelByKey = Object.fromEntries(collected.teachers.map((t) => [t.key, t.label]));
+
+  for (const a of collected.attempts) {
+    const s = ensure(a.studentId, a.studentName);
+    s.attempts.push(a);
+    s.teacherKeys.add(a.teacherKey);
+    s.teacherLabels.add(labelByKey[a.teacherKey] || a.teacherKey);
+  }
+  for (const f of collected.finals || []) {
+    const s = ensure(f.studentId, f.studentName);
+    s.final = { primaryScore: f.primaryScore, secondaryScore: f.secondaryScore, teacherKey: f.teacherKey };
+    s.teacherKeys.add(f.teacherKey);
+    s.teacherLabels.add(labelByKey[f.teacherKey] || f.teacherKey);
+  }
+
+  let rows = [...byStudent.values()];
+  if (teacherKey) rows = rows.filter((s) => s.teacherKeys.has(teacherKey));
+
+  return rows
+    .map((s) => {
+      const perProbnik = collected.probniks.map((p) => {
+        const here = s.attempts.filter((a) => a.sheetIndex === p.sheetIndex);
+        if (here.length === 0) return null;
+        return {
+          secondaryScore: round1(mean(here.map((a) => a.secondaryScore))),
+          primaryScore: round1(mean(here.map((a) => a.primaryScore))),
+        };
+      });
+      const written = perProbnik.filter(Boolean);
+      const lastWritten = [...perProbnik].reverse().find(Boolean) || null;
+      return {
+        studentId: s.studentId,
+        studentName: s.studentName,
+        teachers: [...s.teacherLabels].sort((a, b) => a.localeCompare(b, 'ru')),
+        perProbnik,
+        writtenCount: written.length,
+        avgSecondary: written.length ? round1(mean(written.map((p) => p.secondaryScore))) : null,
+        avgPrimary: written.length ? round1(mean(written.map((p) => p.primaryScore))) : null,
+        final: s.final ? { primaryScore: s.final.primaryScore, secondaryScore: s.final.secondaryScore } : null,
+        deltaSecondary: s.final && lastWritten ? round1(s.final.secondaryScore - lastWritten.secondaryScore) : null,
+        deltaPrimary: s.final && lastWritten ? round1(s.final.primaryScore - lastWritten.primaryScore) : null,
+      };
+    })
+    .sort((a, b) => a.studentName.localeCompare(b.studentName, 'ru'));
 }
 
 // Динамика по пробникам для скоупа (весь предмет или один преподаватель).
