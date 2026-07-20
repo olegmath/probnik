@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Страховка: fetch-data коммитит data.json из-под GITHUB_TOKEN (push-триггер не
+  # срабатывает), а PAT_DISPATCH может протухнуть — крон в :30 доставит данные
+  # на прод максимум через час после обновления.
+  schedule:
+    - cron: '30 * * * *'
 
 permissions:
   contents: read
